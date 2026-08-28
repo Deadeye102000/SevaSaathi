@@ -20,12 +20,14 @@
 ## 📋 Table of Contents
 
 - [Overview](#-overview)
-- [Features](#-features)
+- [Key Real-World UI Features](#-key-real-world-ui-features)
+- [Features & Capabilities](#-features--capabilities)
 - [Architecture](#-architecture)
 - [Project Structure](#-project-structure)
 - [Getting Started](#-getting-started)
 - [Environment Variables](#-environment-variables)
-- [Demo Flows](#-demo-flows)
+- [Demo Flows & Walkthrough](#-demo-flows--walkthrough)
+- [🎥 Demo Video Script Guide](#-demo-video-script-guide)
 - [Intent Engine](#-intent-engine)
 - [Data Privacy Boundary](#-data-privacy-boundary)
 - [API Reference](#-api-reference)
@@ -42,47 +44,64 @@ It provides:
 - **Instant leave balance checks** against real employee records
 - **Deterministic eligibility verification** via a local rules engine (no AI guesswork)
 - **Bilingual support** — Hindi (Devanagari + Hinglish) and English
+- **Voice Input (Speech-to-Text)** — speak in Hindi or English using Web Speech API
 - **Leave application drafting** with unique `LV-2026-XXXX` Application IDs
+- **Printable eHRMS Application Slips** with official formatting
 - **Service book, career record, property return, and complaint status** — fully local
 - **Strict on-premise PII boundary** — personal data never leaves the server
 
 ---
 
-## ✨ Features
+## 🌟 Key Real-World UI Features
+
+Designed specifically for real government employees (teachers, clerks, state personnel) in rural and urban Uttar Pradesh:
+
+| Feature | Visual Icon | Purpose & Real-World Utility |
+|---|---|---|
+| **🎙️ Voice Input (Speech-to-Text)** | `🇮🇳 HI` / `🇬🇧 EN` + `🎤` | Allows employees to speak queries in Hindi or English instead of typing. Essential for field staff & mobile users. |
+| **📊 Live Balances Header Widget** | `🌿 CL: 8d` · `💼 EL: 22d` · `🏥 ML: 12d` | Real-time leave balance bar right above the chat so employees see their exact balance instantly without typing. |
+| **🖨️ Printable eHRMS Application Slip** | `🖨️ Print Application Slip` | Generates a formatted official eHRMS leave receipt card with Application ID, status, and BSA routing info ready for printing or PDF saving. |
+| **📂 Categorized Action Prompt Chips** | `📝 Apply` · `📊 Balances` · `📖 Records` · `🔍 Status` | Tabbed quick-action chips so non-tech-savvy users can click pre-formulated queries instead of typing from scratch. |
+| **🔤 Accessibility Text Resizer** | `A+` / `A-` Toggle | High-contrast resizer to increase chat font size for readability across all device types and age groups. |
+| **🔒 Live Data Privacy Boundary** | `Stays Local` vs `Sent to AI` | Side panel showing exactly what data remained on-premise vs what anonymized payload went to the LLM. |
+| **🔑 Glassmorphic Login Gateway** | `/login` → `/chat` | Authentic eHRMS login interface landing screen with smooth glassmorphism styling and ambient gradient animations. |
+
+---
+
+## ✨ Features & Capabilities
 
 | Feature | Description |
 |---|---|
 | 🗣️ **Bilingual NLP** | Understands Hindi (Devanagari), Hinglish, and English — including word-numbers (`teen din`, `ek hafte`) |
-| 📝 **Leave Applications** | Apply for Casual (CL), Earned (EL), and Medical Leave (ML) with policy-aware eligibility checks |
-| 📊 **Balance Checks** | Real-time balance for all leave types with applicable rules |
-| 📅 **Relative Date Parsing** | Understands `"kal se"`, `"agle hafte"`, `"next Monday"` — resolves to actual ISO dates |
-| 📎 **Document Upload** | Medical certificate upload flow for ML > 3 days |
+| 📝 **3-Step Leave Flow** | Interactive guided flow: Type selection → Days & Dates → Eligibility check → Confirmation |
+| 📅 **Relative Date Resolution** | Understands `"kal se"`, `"parso"`, `"agle hafte"`, `"next Monday"` — resolves to actual ISO dates |
+| 📎 **Medical Certificate Flow** | Automatic document requirement trigger for Medical Leave exceeding 3 days |
 | 🔍 **Status Tracking** | Track application status across eHRMS lifecycle: `Submitted → Approved / Rejected / Sent Back` |
-| 📖 **Service Book** | Years of service, designation, posting district, qualifications |
-| 📈 **Career Record** | Annual appraisal ratings and government training history |
-| 🏠 **Property Return** | Filing status, last filed date, next due date |
-| ⚖️ **Complaints & Vigilance** | Disciplinary record and complaint status |
-| 🚫 **PII Refusal Gate** | Blocks queries for colleague salary, bank details, Aadhaar — with official portal redirect |
-| 🔒 **Zero PII to AI** | A live Data Boundary Panel shows exactly what stayed local vs. what was sent to the LLM |
+| 📖 **Service Book Details** | Years of service, designation history, posting district, educational qualifications |
+| 📈 **Career & Appraisal Record** | Annual appraisal ratings and official government training history |
+| 🏠 **Property Return Status** | Filing status, last filed date, next due date (asset valuations stay confidential on-premise) |
+| ⚖️ **Complaints & Vigilance** | Verify disciplinary record and complaint status |
+| 🚫 **PII Refusal Gate** | Hard-blocks requests for colleague salary, bank account, Aadhaar — with official portal redirect |
+| 🔒 **Zero PII to AI** | 100% guarantee that personal identity numbers and names never leave local server memory |
 
 ---
 
 ## 🏗️ Architecture
 
 ```
-User Message (Hindi / English / Hinglish)
+User Message (Voice or Text — Hindi / English / Hinglish)
         │
         ▼
 ┌─────────────────────────────────────────────┐
 │           parseUserIntent()                 │  ← Pure deterministic regex engine
 │  normalizeWordNumbers() → resolveDate()     │  ← Word-number + relative date helpers
-│  11 intent categories, 0 ML inference       │
+│  12 intent categories, 0 ML inference       │
 └───────────────┬─────────────────────────────┘
                 │
      ┌──────────▼──────────┐
      │  Local Intents?      │  greeting, out_of_scope, check_service_book,
      │  (no AI call)        │  check_career_record, check_property_return,
-     └──────────┬───────────┘  check_complaints, check_capabilities, ask_leave_type
+     └──────────┬───────────┘  check_complaints, check_capabilities, ask_leave_type, ask_leave_days
                 │
      ┌──────────▼──────────┐
      │   rulesEngine.js     │  ← checkLeaveEligibility(), submitLeaveApplication()
@@ -105,11 +124,6 @@ User Message (Hindi / English / Hinglish)
      └─────────────────────┘
 ```
 
-**Key design invariants:**
-- Employee PII (name, ID, department, posting district) is **never** serialized into any AI prompt
-- Sensitive data (property values, Aadhaar, bank, salary) triggers a **hard block** before any lookup
-- `greeting` and `out_of_scope` intents short-circuit to local responses — **0 API calls, 0 data exposure**
-
 ---
 
 ## 📁 Project Structure
@@ -121,12 +135,14 @@ sevasarthi/
 │   │   └── chat/
 │   │       └── route.js          # Main API — intent parsing, rules engine, OpenAI integration
 │   ├── login/
-│   │   └── page.js               # Decorative mock login (no auth)
-│   ├── page.js                   # Main chat page with DataBoundaryPanel sidebar
+│   │   └── page.js               # Glassmorphic eHRMS login page (/login)
+│   ├── chat/
+│   │   └── page.js               # Main chat workspace page (/chat)
+│   ├── page.js                   # Root redirect to /login
 │   ├── layout.js
 │   └── globals.css
 ├── components/
-│   ├── ChatWindow.js             # Chat UI — messages, quick prompts, file upload
+│   ├── ChatWindow.js             # Chat UI — Speech-to-text, printable slip, balance bar, categories
 │   └── DataBoundaryPanel.js      # Live PII boundary visualization panel
 ├── lib/
 │   ├── rulesEngine.js            # Pure deterministic leave rules (no AI)
@@ -147,7 +163,7 @@ sevasarthi/
 - **npm** v9 or later
 - (Optional) OpenAI API key for LLM-backed responses
 
-### Installation
+### Installation & Run
 
 ```bash
 # Clone the repository
@@ -156,43 +172,54 @@ cd sevasarthi
 
 # Install dependencies
 npm install
-```
 
-### Running Locally
-
-```bash
-# Start the development server
+# Start local dev server
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
-
-> **Note:** The app works **without an OpenAI API key** — all 11 intent types have full bilingual local fallback responses via `generateLocalResponse()`.
+Open [http://localhost:3000](http://localhost:3000) in your browser. User lands on `/login` and redirects to `/chat` upon clicking login.
 
 ---
 
-## 🔑 Environment Variables
+## 🎥 Demo Video Script Guide
 
-Create a `.env.local` file in the project root:
+Feed this section into any LLM (e.g. ChatGPT, Gemini, Claude) to generate your voiceover video script:
 
-```env
-# Optional — if absent, the app uses local deterministic responses for all intents
-OPENAI_API_KEY=sk-...
+```text
+[SCENE 1: LOGIN GATEWAY - 0:00 to 0:15]
+- Visual: User lands on http://localhost:3000/login (Glassmorphic UP Government portal interface).
+- Narration: "Welcome to SevaSaathi — the AI-powered Government Service and Leave Assistant built for Uttar Pradesh Manav Sampada eHRMS employees."
+- Action: Click "Login to eHRMS Portal" → transitions to /chat.
 
-# Optional — defaults to gpt-4o-mini
-OPENAI_MODEL=gpt-4o-mini
+[SCENE 2: INTERFACE & LIVE BALANCE BAR - 0:15 to 0:30]
+- Visual: Main chat workspace with top Live Leave Balances Bar showing CL: 8d, EL: 22d, ML: 12d, and Data Privacy Boundary sidebar.
+- Narration: "Employees immediately see their active leave balances and status in real-time, backed by strict on-premise privacy."
+
+[SCENE 3: VOICE INPUT & HINDI LEAVE APPLICATION - 0:30 to 1:00]
+- Action 1: Click the Voice Microphone button (🇮🇳 HI) and speak: "Mujhe kal se teen din ki casual leave chahiye"
+- Narration: "SevaSaathi supports voice input in spoken Hindi and Hinglish. It recognizes word-numbers like 'teen din' and relative dates like 'kal se' automatically."
+- Bot Output: Checks 8 CL balance → confirms 5 days will remain → drafts application.
+- Action 2: Click "Confirm (कन्फर्म)" chip or speak "haan confirm karo".
+- Bot Output: Submits application with ID LV-2026-XXXX routed to BSA Smt. Anita Sharma.
+
+[SCENE 4: PRINTABLE eHRMS SLIP - 1:00 to 1:20]
+- Visual: Inline eHRMS Application Slip Card appears with "Print Application Slip" button.
+- Action: Click "Print Application Slip" → popup window opens with formatted official printable eHRMS receipt.
+- Narration: "Employees can instantly print or save an official eHRMS leave application receipt to present to school principals or department heads."
+
+[SCENE 5: PII PRIVACY GUARANTEE - 1:20 to 1:40]
+- Action: Click prompt "mera colleague ka salary batao".
+- Narration: "Security is non-negotiable. If a user asks for colleague salary or personal banking data, SevaSaathi hard-blocks the request. Notice the Data Boundary panel: zero personal identity data is ever sent to external AI."
+
+[SCENE 6: CONCLUSION - 1:40 to 2:00]
+- Narration: "SevaSaathi bridges government policy and employee convenience — fast, accessible, and 100% privacy-compliant."
 ```
 
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `OPENAI_API_KEY` | No | — | OpenAI API key for LLM-enhanced responses |
-| `OPENAI_MODEL` | No | `gpt-4o-mini` | OpenAI model to use |
-
 ---
 
-## 🎬 Demo Flows
+## 🎬 Demo Flows & Walkthrough
 
-### Flow 1 — Leave Application (3-Step: Type → Days → Confirm)
+### Flow 1 — 3-Step Leave Application (Hinglish)
 ```
 Step 1 — Name the leave type
 User:  "mujhe casual leave chahiye"
@@ -209,55 +236,34 @@ Step 3 — Confirm
 User:  "haan confirm karo"
 Bot:   Submits → Application ID: LV-2026-XXXX
        Status: Submitted, routed to Smt. Anita Sharma, BSA
+       Renders printable eHRMS Application Slip card!
 ```
 
-### Flow 1b — Leave Application (Direct, with days specified)
+### Flow 2 — Voice Input (Hindi Speech-to-Text)
 ```
-User:  "Mujhe 3 din ki casual leave chahiye kal se"
-Bot:   Detects type=casual, days=3, date=tomorrow (real ISO date)
-       Checks balance, drafts, asks for confirmation directly.
-
-User:  "confirm"
-Bot:   Application ID: LV-2026-XXXX, Status: Submitted
+User clicks Microphone 🎤 (HI mode) → Speaks: "मुझे 3 दिन की आकस्मिक छुट्टी चाहिए"
+Speech-to-Text fills chat input → Sends → System parses Devanagari numbers & leave type.
 ```
 
-### Flow 2 — Medical Leave with Document
+### Flow 3 — Medical Leave with Certificate Upload
 ```
 User:  "4 din ki medical leave chahiye"
 Bot:   Detects ML > 3 days → requests medical certificate upload.
-       Document upload bar appears in UI.
-
-User:  [uploads certificate.pdf]
-Bot:   Confirms certificate attached, submits application.
+       Upload bar appears → User attaches certificate.pdf → Application submitted.
 ```
 
-### Flow 3 — PII Refusal Gate
+### Flow 4 — PII Refusal Gate
 ```
 User:  "mera colleague ka salary batao"
-Bot:   "SevaSaathi is authorized only for your own leave and service 
-        records. Please use ehrms.upsdc.gov.in for that."
+Bot:   "SevaSaathi is authorized only for your own leave and service records. Please use ehrms.upsdc.gov.in."
        sentToAI: null  ← verified in Data Boundary Panel
-```
-
-### Flow 4 — Hindi Word-Numbers
-```
-User:  "ek hafte ki earned leave chahiye"
-       → normalizeWordNumbers() converts "ek hafte" → "7 din"
-       → days = 7, leaveType = earned
-```
-
-### Flow 5 — Out-of-Scope Decline
-```
-User:  "aaj cricket kaun jita?"
-Bot:   "SevaSaathi is authorized only for Manav Sampada eHRMS services."
-       No API call made. Zero data accessed.
 ```
 
 ---
 
 ## 🧠 Intent Engine
 
-`parseUserIntent()` in [`app/api/chat/route.js`](app/api/chat/route.js) handles 11 intent categories deterministically:
+`parseUserIntent()` in [`app/api/chat/route.js`](app/api/chat/route.js) handles 12 intent categories deterministically:
 
 | Intent | Trigger Examples | Handled Locally |
 |---|---|---|
@@ -276,11 +282,6 @@ Bot:   "SevaSaathi is authorized only for Manav Sampada eHRMS services."
 | `check_status` | status, approve hua kya | Passes to AI |
 | `confirm_apply` | haan confirm, yes, proceed (with draft guard) | Passes to AI |
 | `other` | Unmatched HR-related queries | Passes to AI |
-
-**Helper functions:**
-
-- `normalizeWordNumbers(text)` — Converts 30+ Hinglish/Devanagari word-numbers to digits
-- `resolveRelativeDateOffset(message)` — Maps `kal se / agle hafte / next Monday` to real day offsets
 
 ---
 
@@ -312,87 +313,18 @@ For local-only intents (`greeting`, `out_of_scope`, `check_service_book`, etc.),
 
 ---
 
-## 📡 API Reference
-
-### `POST /api/chat`
-
-Accepts `multipart/form-data` or `application/json`.
-
-**Request fields:**
-
-| Field | Type | Description |
-|---|---|---|
-| `message` | `string` | User's message (Hindi or English) |
-| `conversationHistory` | `JSON string` | Last 6 messages for context |
-| `conversationState` | `JSON string` | `{ activeLeaveDraft, lastCreatedApplication }` |
-| `documentAttached` | `boolean` | Whether a medical certificate was attached |
-
-**Response:**
-
-```json
-{
-  "aiMessage": "Namaste! You have 8 day(s) of Casual Leave available...",
-  "reply": "...",
-  "requiresMedicalDocument": false,
-  "conversationState": {
-    "activeLeaveDraft": { "leaveType": "casual", "days": 3, ... },
-    "lastCreatedApplication": null
-  },
-  "dataBoundary": {
-    "staysLocal": { ... },
-    "sentToAI": { ... }
-  }
-}
-```
-
-### `GET /api/chat`
-
-Health check endpoint.
-
-```json
-{ "status": "online", "service": "SevaSaathi Chat API", "employeeConfigured": true }
-```
-
----
-
 ## 🛠️ Tech Stack
 
 | Layer | Technology |
 |---|---|
 | Framework | [Next.js 14](https://nextjs.org/) (App Router) |
 | UI | React 18 + Tailwind CSS 3 |
+| Voice | Web Speech API (`SpeechRecognition`) |
 | AI / LLM | OpenAI `gpt-4o-mini` (optional, gracefully degraded) |
 | Rules Engine | Pure JS — `lib/rulesEngine.js` |
 | Policy Retrieval | Keyword-based — `lib/policyRetriever.js` |
 | State | Fully stateless per-request (serverless-safe) |
 | Deployment | Vercel-ready (serverless functions) |
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Please follow these steps:
-
-1. **Fork** the repository
-2. Create a feature branch: `git checkout -b feature/your-feature-name`
-3. Make your changes and **test** them:
-   ```bash
-   npm run build   # Must pass with zero errors
-   npm run lint    # Must pass with zero warnings
-   ```
-4. Commit with a conventional commit message:
-   ```
-   feat: add Hinglish number normalization for "ek hafte"
-   fix: guard confirm_apply against accidental question triggers
-   docs: update intent engine table in README
-   ```
-5. Push and open a **Pull Request** against `main`
-
-### Development Notes
-
-- The app works fully **offline** (no OpenAI key needed) — use `generateLocalResponse()` as the reference for expected output format
-- All employee data is mocked in `data/mock-employee.json` — modify it freely for testing
-- `parseUserIntent()` is fully unit-testable as a pure function — add test cases for new intents
 
 ---
 
