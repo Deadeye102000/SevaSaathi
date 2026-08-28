@@ -1,0 +1,82 @@
+{
+    "employee_id": "UP-EHRMS-88213",
+    "name": "Ravi Kumar",
+    "department": "Basic Education",
+    "designation": "Assistant Teacher",
+    "posting_category": "RURAL",
+    "posting_district": "Sitapur",
+    "service_years": 6.5,
+    "reporting_officer": "Smt. Anita Sharma, BSA",
+    "leave_balance": {
+        "casual": 8,
+        "earned": 22,
+        "medical": 12
+    },
+    "leave_history": [
+        {
+            "id": "LV-2026-0311",
+            "type": "casual",
+            "days": 2,
+            "status": "Approved",
+            "remark": "Approved - enjoy your leave",
+            "reporting_officer": "Smt. Anita Sharma, BSA",
+            "dates": "2026-06-14 to 2026-06-15"
+        }
+    ],
+    "service_book": {
+        "joining_date": "2019-07-15",
+        "designation_history": [
+            {
+                "designation": "Assistant Teacher",
+                "from": "2019-07-15",
+                "to": "present"
+            }
+        ],
+        "postings": [
+            {
+                "school": "GPS Sitapur East",
+                "district": "Sitapur",
+                "from": "2019-07-15",
+                "to": "present"
+            }
+        ],
+        "education": [
+            {
+                "qualification": "B.Ed",
+                "institution": "Lucknow University",
+                "year": 2018
+            }
+        ]
+    },
+    "career_record": {
+        "annual_appraisals": [
+            {
+                "year": 2025,
+                "rating": "Very Good"
+            }
+        ],
+        "trainings_attended": [
+            {
+                "name": "Digital Classroom Training",
+                "date": "2025-03-10"
+            }
+        ]
+    },
+    "property_return": {
+        "last_filed_date": "2026-01-31",
+        "status": "Filed",
+        "next_due_date": "2027-01-31",
+        "assets_declared_count": 3,
+        "assets_declared_detail": [
+            {
+                "type": "Residential Property",
+                "location": "Sitapur",
+                "value_declared": "₹18,00,000"
+            }
+        ]
+    },
+    "complaints": {
+        "submitted": [],
+        "status_note": "No complaints on record"
+    }
+}
