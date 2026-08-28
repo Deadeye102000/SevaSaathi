@@ -294,6 +294,51 @@ export default function ChatWindow({ onDataBoundaryUpdate }) {
     }
   };
 
+  // Visual Horizontal Status Progress Tracker Component
+  const renderApplicationProgress = (status = 'Submitted') => {
+    const norm = (status || 'Submitted').toLowerCase();
+    const isApproved = norm === 'approved';
+    const isRejected = norm === 'rejected';
+    const isSentBack = norm === 'sent back';
+    const isSubmitted = norm === 'submitted' || (!isApproved && !isRejected && !isSentBack);
+
+    return (
+      <div className="py-2 space-y-1.5 my-1 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+        <div className="flex items-center justify-between text-[10px] font-medium px-0.5">
+          <span className="text-emerald-400 font-bold flex items-center gap-1">
+            <span>✓</span> 1. Submitted
+          </span>
+          <span className={isSubmitted ? 'text-amber-400 font-bold animate-pulse flex items-center gap-1' : 'text-emerald-400 font-bold flex items-center gap-1'}>
+            <span>{isSubmitted ? '⏳' : '✓'}</span> 2. Officer Review
+          </span>
+          <span className={isApproved ? 'text-emerald-400 font-bold flex items-center gap-1' : isRejected || isSentBack ? 'text-red-400 font-bold flex items-center gap-1' : 'text-slate-500 flex items-center gap-1'}>
+            <span>{isApproved ? '✅' : isRejected || isSentBack ? '❌' : '⚪'}</span>
+            3. {isApproved ? 'Approved' : isRejected ? 'Rejected' : isSentBack ? 'Sent Back' : 'Final Status'}
+          </span>
+        </div>
+
+        {/* Horizontal Track Bar */}
+        <div className="relative w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+          <div
+            className={`h-full transition-all duration-700 rounded-full ${
+              isApproved
+                ? 'w-full bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-400'
+                : isRejected || isSentBack
+                ? 'w-full bg-gradient-to-r from-emerald-500 via-amber-400 to-red-500'
+                : 'w-1/2 bg-gradient-to-r from-emerald-500 to-amber-400 animate-pulse'
+            }`}
+          />
+        </div>
+
+        <div className="flex justify-between text-[9px] text-slate-500 px-0.5 font-mono">
+          <span>eHRMS ID Issued</span>
+          <span>Smt. Anita Sharma, BSA</span>
+          <span>{isApproved ? 'Approved' : isSubmitted ? 'Pending Decision' : status}</span>
+        </div>
+      </div>
+    );
+  };
+
   // Helper to copy application slip text
   const handleCopySlip = (app) => {
     const text = `Manav Sampada eHRMS Leave Application Slip
@@ -443,8 +488,12 @@ Routed To: ${app.routed_to || 'Smt. Anita Sharma, BSA'}`;
           <div className="hidden sm:flex p-2 rounded-xl bg-purple-950/30 border border-purple-500/20 flex-col justify-between">
             <span className="text-[10px] text-slate-400 font-medium">📌 Last Record Status</span>
             <div className="flex items-center justify-between mt-1">
-              <span className="text-[11px] font-semibold text-purple-300 truncate">LV-2026-0311</span>
-              <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold">Approved</span>
+              <span className="text-[11px] font-semibold text-purple-300 truncate">
+                {conversationState.lastCreatedApplication?.id || 'LV-2026-0311'}
+              </span>
+              <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold">
+                {conversationState.lastCreatedApplication?.status || 'Approved'}
+              </span>
             </div>
           </div>
         </div>
@@ -516,6 +565,9 @@ Routed To: ${app.routed_to || 'Smt. Anita Sharma, BSA'}`;
                         <span className="font-semibold text-slate-200">{msg.applicationRecord.routed_to || 'Smt. Anita Sharma, BSA'}</span>
                       </div>
                     </div>
+
+                    {/* Horizontal Visual Status Tracker */}
+                    {renderApplicationProgress(msg.applicationRecord.status)}
 
                     <div className="flex items-center gap-2 pt-2 border-t border-slate-800">
                       <button

@@ -47,9 +47,8 @@ export default function ChatPage() {
             </div>
           </div>
 
-          {/* Right: Status chips */}
+          {/* Right: User chip */}
           <div className="flex items-center gap-2 flex-shrink-0">
-            {/* User chip */}
             <Link
               href="/login"
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-[11px] text-slate-300 hover:text-white transition-all"
@@ -59,13 +58,6 @@ export default function ChatPage() {
               </div>
               <span className="hidden sm:inline">Ravi Kumar</span>
             </Link>
-
-            {/* PII guard badge */}
-            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-emerald-500/[0.08] border border-emerald-500/20 text-[11px] text-emerald-400 font-medium whitespace-nowrap">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="hidden xs:inline">PII Guard</span>
-              <span className="xs:hidden">🔒</span>
-            </div>
           </div>
         </div>
 
@@ -88,22 +80,6 @@ export default function ChatPage() {
           ))}
         </div>
       </header>
-
-      {/* ── Sub-header context banner ── */}
-      <div className="relative z-10 border-b border-white/[0.04] bg-white/[0.01]">
-        <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-center gap-6">
-          {[
-            { icon: '🗣️', text: 'Hindi + English' },
-            { icon: '🔒', text: 'Zero PII to AI' },
-            { icon: '⚡', text: 'Instant local rules engine' },
-          ].map(({ icon, text }) => (
-            <div key={text} className="flex items-center gap-1.5 text-[11px] text-slate-500">
-              <span className="text-xs">{icon}</span>
-              <span>{text}</span>
-            </div>
-          ))}
-        </div>
-      </div>
 
       {/* ── Main layout ── */}
       <main className="relative z-10 flex-1 max-w-7xl w-full mx-auto p-4 sm:p-5 flex flex-col min-h-0">
