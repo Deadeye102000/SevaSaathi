@@ -42,7 +42,7 @@ export default function ChatPage() {
                 </span>
               </div>
               <p className="text-[10px] text-slate-500 truncate hidden sm:block">
-                UP Government Service &amp; Leave Assistant
+                UP Manav Sampada eHRMS Assistant
               </p>
             </div>
           </div>

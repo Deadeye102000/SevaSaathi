@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import DataBoundaryPanel from '@/components/DataBoundaryPanel';
+import StatusTracker from '@/components/StatusTracker';
 
 const PROMPT_CATEGORIES = [
   { id: 'all', label: '⭐ All Prompts' },
@@ -36,7 +37,8 @@ const CATEGORIZED_PROMPTS = [
  * ChatWindow Component
  * Practical UI for UP Government Employees (eHRMS Manav Sampada).
  * Features:
- * - Live Leave Balances Bar
+ * - Live Leave Balances Bar with "Last updated: just now"
+ * - Standalone StatusTracker component (Submitted -> Under Review -> Officer Decision -> Approved)
  * - Web Speech API Voice Input (Hindi & English)
  * - Official eHRMS Application Slip Card generator with Print & Copy capabilities
  * - Categorized Quick Action Chips
@@ -183,7 +185,6 @@ export default function ChatWindow({ onDataBoundaryUpdate }) {
 
     setMessages((prev) => [...prev, userMessage]);
     setInput('');
-    setLoading(false);
     setLoading(true);
 
     try {
@@ -233,8 +234,35 @@ export default function ChatWindow({ onDataBoundaryUpdate }) {
         if (fileInputRef.current) fileInputRef.current.value = '';
       }
 
-      // Check if application was just created
+      // Detect status check or application creation in response
       const applicationCreated = data.lastCreatedApplication || (data.conversationState?.lastCreatedApplication);
+
+      // Status extraction for check_status responses
+      let statusToTrack = null;
+      if (applicationCreated) {
+        statusToTrack = {
+          status: applicationCreated.status || 'Submitted',
+          officer: applicationCreated.routed_to || 'Smt. Anita Sharma, BSA',
+        };
+      } else if (
+        replyText.includes('Approved') ||
+        replyText.includes('Submitted') ||
+        replyText.includes('Sent Back') ||
+        replyText.includes('Rejected')
+      ) {
+        const detectedStatus = replyText.includes('Approved')
+          ? 'Approved'
+          : replyText.includes('Sent Back')
+          ? 'Sent Back'
+          : replyText.includes('Rejected')
+          ? 'Rejected'
+          : 'Submitted';
+
+        statusToTrack = {
+          status: detectedStatus,
+          officer: 'Smt. Anita Sharma, BSA',
+        };
+      }
 
       const botMessage = {
         id: `bot-${Date.now()}`,
@@ -242,6 +270,7 @@ export default function ChatWindow({ onDataBoundaryUpdate }) {
         text: replyText,
         dataBoundary: data.dataBoundary,
         applicationRecord: applicationCreated,
+        statusData: statusToTrack,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
 
@@ -270,7 +299,7 @@ export default function ChatWindow({ onDataBoundaryUpdate }) {
     const welcome = {
       id: `welcome-${Date.now()}`,
       sender: 'assistant',
-      text: 'Namaste! I am SevaSaathi, your Government Service and Leave Entitlements Assistant (UP Manav Sampada eHRMS). How may I assist you today?',
+      text: 'Namaste! I am SevaSaathi, your UP Manav Sampada eHRMS Assistant. How may I assist you today?',
       timestamp: 'Just now',
       dataBoundary: {
         staysLocal: {
@@ -292,51 +321,6 @@ export default function ChatWindow({ onDataBoundaryUpdate }) {
     if (onDataBoundaryUpdate) {
       onDataBoundaryUpdate(welcome.dataBoundary);
     }
-  };
-
-  // Visual Horizontal Status Progress Tracker Component
-  const renderApplicationProgress = (status = 'Submitted') => {
-    const norm = (status || 'Submitted').toLowerCase();
-    const isApproved = norm === 'approved';
-    const isRejected = norm === 'rejected';
-    const isSentBack = norm === 'sent back';
-    const isSubmitted = norm === 'submitted' || (!isApproved && !isRejected && !isSentBack);
-
-    return (
-      <div className="py-2 space-y-1.5 my-1 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
-        <div className="flex items-center justify-between text-[10px] font-medium px-0.5">
-          <span className="text-emerald-400 font-bold flex items-center gap-1">
-            <span>✓</span> 1. Submitted
-          </span>
-          <span className={isSubmitted ? 'text-amber-400 font-bold animate-pulse flex items-center gap-1' : 'text-emerald-400 font-bold flex items-center gap-1'}>
-            <span>{isSubmitted ? '⏳' : '✓'}</span> 2. Officer Review
-          </span>
-          <span className={isApproved ? 'text-emerald-400 font-bold flex items-center gap-1' : isRejected || isSentBack ? 'text-red-400 font-bold flex items-center gap-1' : 'text-slate-500 flex items-center gap-1'}>
-            <span>{isApproved ? '✅' : isRejected || isSentBack ? '❌' : '⚪'}</span>
-            3. {isApproved ? 'Approved' : isRejected ? 'Rejected' : isSentBack ? 'Sent Back' : 'Final Status'}
-          </span>
-        </div>
-
-        {/* Horizontal Track Bar */}
-        <div className="relative w-full h-2 bg-slate-800 rounded-full overflow-hidden">
-          <div
-            className={`h-full transition-all duration-700 rounded-full ${
-              isApproved
-                ? 'w-full bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-400'
-                : isRejected || isSentBack
-                ? 'w-full bg-gradient-to-r from-emerald-500 via-amber-400 to-red-500'
-                : 'w-1/2 bg-gradient-to-r from-emerald-500 to-amber-400 animate-pulse'
-            }`}
-          />
-        </div>
-
-        <div className="flex justify-between text-[9px] text-slate-500 px-0.5 font-mono">
-          <span>eHRMS ID Issued</span>
-          <span>Smt. Anita Sharma, BSA</span>
-          <span>{isApproved ? 'Approved' : isSubmitted ? 'Pending Decision' : status}</span>
-        </div>
-      </div>
-    );
   };
 
   // Helper to copy application slip text
@@ -458,42 +442,48 @@ Routed To: ${app.routed_to || 'Smt. Anita Sharma, BSA'}`;
         </div>
       </div>
 
-      {/* ── Live Leave Balances Bar (Visual Cards for Real Employees) ── */}
+      {/* ── Live Leave Balances Bar (Visual Cards with "Last updated: just now") ── */}
       {showBalanceBar && (
-        <div className="px-4 py-2.5 bg-[#030712]/60 border-b border-slate-800/60 grid grid-cols-3 sm:grid-cols-4 gap-2 text-xs">
-          <div className="p-2 rounded-xl bg-emerald-950/30 border border-emerald-500/20 flex flex-col justify-between">
-            <span className="text-[10px] text-slate-400 font-medium">🌿 Casual Leave (CL)</span>
-            <div className="flex items-baseline justify-between mt-1">
-              <span className="text-sm font-bold text-emerald-400">{balances.casual} Days</span>
-              <span className="text-[9px] text-slate-500">Max 14/yr</span>
-            </div>
+        <div className="px-4 py-2 bg-[#030712]/70 border-b border-slate-800/60 space-y-1 text-xs">
+          <div className="flex items-center justify-between px-0.5">
+            <span className="text-[10px] text-slate-500 font-mono">Leave Balances</span>
+            <span className="text-[10px] text-slate-500 font-mono">Last updated: just now</span>
           </div>
-
-          <div className="p-2 rounded-xl bg-teal-950/30 border border-teal-500/20 flex flex-col justify-between">
-            <span className="text-[10px] text-slate-400 font-medium">💼 Earned Leave (EL)</span>
-            <div className="flex items-baseline justify-between mt-1">
-              <span className="text-sm font-bold text-teal-400">{balances.earned} Days</span>
-              <span className="text-[9px] text-slate-500">Accrued</span>
+          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+            <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800/80 shadow-sm flex flex-col justify-between">
+              <span className="text-[10px] text-slate-400 font-medium">🌿 Casual Leave (CL)</span>
+              <div className="flex items-baseline justify-between mt-1">
+                <span className="text-sm font-bold text-emerald-400">{balances.casual} Days</span>
+                <span className="text-[9px] text-slate-500 font-mono">Max 14/yr</span>
+              </div>
             </div>
-          </div>
 
-          <div className="p-2 rounded-xl bg-blue-950/30 border border-blue-500/20 flex flex-col justify-between">
-            <span className="text-[10px] text-slate-400 font-medium">🏥 Medical Leave (ML)</span>
-            <div className="flex items-baseline justify-between mt-1">
-              <span className="text-sm font-bold text-blue-400">{balances.medical} Days</span>
-              <span className="text-[9px] text-slate-500">&gt;3d doc req</span>
+            <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800/80 shadow-sm flex flex-col justify-between">
+              <span className="text-[10px] text-slate-400 font-medium">💼 Earned Leave (EL)</span>
+              <div className="flex items-baseline justify-between mt-1">
+                <span className="text-sm font-bold text-teal-400">{balances.earned} Days</span>
+                <span className="text-[9px] text-slate-500 font-mono">Accrued</span>
+              </div>
             </div>
-          </div>
 
-          <div className="hidden sm:flex p-2 rounded-xl bg-purple-950/30 border border-purple-500/20 flex-col justify-between">
-            <span className="text-[10px] text-slate-400 font-medium">📌 Last Record Status</span>
-            <div className="flex items-center justify-between mt-1">
-              <span className="text-[11px] font-semibold text-purple-300 truncate">
-                {conversationState.lastCreatedApplication?.id || 'LV-2026-0311'}
-              </span>
-              <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold">
-                {conversationState.lastCreatedApplication?.status || 'Approved'}
-              </span>
+            <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800/80 shadow-sm flex flex-col justify-between">
+              <span className="text-[10px] text-slate-400 font-medium">🏥 Medical Leave (ML)</span>
+              <div className="flex items-baseline justify-between mt-1">
+                <span className="text-sm font-bold text-blue-400">{balances.medical} Days</span>
+                <span className="text-[9px] text-slate-500 font-mono">&gt;3d doc req</span>
+              </div>
+            </div>
+
+            <div className="hidden sm:flex p-2.5 rounded-xl bg-slate-900/90 border border-slate-800/80 shadow-sm flex-col justify-between">
+              <span className="text-[10px] text-slate-400 font-medium">📌 Last Record Status</span>
+              <div className="flex items-center justify-between mt-1">
+                <span className="text-[11px] font-semibold text-purple-300 truncate">
+                  {conversationState.lastCreatedApplication?.id || 'LV-2026-0311'}
+                </span>
+                <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold">
+                  {conversationState.lastCreatedApplication?.status || 'Approved'}
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -534,6 +524,14 @@ Routed To: ${app.routed_to || 'Smt. Anita Sharma, BSA'}`;
                   {msg.text}
                 </div>
 
+                {/* Render Standalone StatusTracker when status data is present or created */}
+                {!isUser && msg.statusData && (
+                  <StatusTracker
+                    currentStatus={msg.statusData.status}
+                    officer={msg.statusData.officer}
+                  />
+                )}
+
                 {/* Render Official Application Slip Card when an application is submitted */}
                 {msg.applicationRecord && (
                   <div className="p-4 rounded-xl bg-gradient-to-br from-slate-900 via-emerald-950/30 to-slate-900 border border-emerald-500/30 text-xs shadow-lg space-y-3">
@@ -565,9 +563,6 @@ Routed To: ${app.routed_to || 'Smt. Anita Sharma, BSA'}`;
                         <span className="font-semibold text-slate-200">{msg.applicationRecord.routed_to || 'Smt. Anita Sharma, BSA'}</span>
                       </div>
                     </div>
-
-                    {/* Horizontal Visual Status Tracker */}
-                    {renderApplicationProgress(msg.applicationRecord.status)}
 
                     <div className="flex items-center gap-2 pt-2 border-t border-slate-800">
                       <button
