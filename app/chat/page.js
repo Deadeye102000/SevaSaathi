@@ -262,23 +262,26 @@ export default function ChatPage() {
             {isRoadmapOpen && (
               <div id="production-roadmap-content" className="px-4 pb-4 pt-3 border-t border-white/[0.04] space-y-3">
                 <div className="p-3 rounded-xl bg-emerald-500/[0.08] border border-emerald-500/20 text-[11px] text-slate-300 leading-relaxed">
-                  <span className="text-emerald-400 font-semibold">✅ Live in this demo: </span>
-                  Leave applications (CL/EL/ML), Service Book, Career Record, Property Return, Complaint status — all with zero PII sent to AI.
+                  <span className="text-emerald-400 font-semibold">✅ Current Live Status: </span>
+                  Guided 3-step leave application flow (CL/EL/ML with mandatory start dates), reporting officer approval dashboard, multi-employee KV persistence, 4 zero-PII record lookup intents (Service Book, Career Record, Property Return, Complaints), medical certificate upload, & live compliance audit logging.
+                </div>
+                <div className="text-[11px] text-purple-400 font-semibold pt-1 flex items-center gap-1.5">
+                  <span>🚀 Future Production Roadmap (Extending Same Zero-PII Architecture):</span>
                 </div>
                 <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
                   {[
-                    ['Real eHRMS API integration', 'currently: mock employee data'],
-                    ['Persistent database for applications', 'currently: in-memory session'],
-                    ['Self-hosted/approved government LLM', 'currently: OpenAI — architecture is model-agnostic'],
-                    ['Additional modules: tour, transfer, GPF/pension', ''],
-                    ['Medical certificate verification pipeline', 'currently: attachment-only'],
-                    ['Voice input for employees less comfortable typing', ''],
+                    ['Real eHRMS API Integration', 'direct state portal connect'],
+                    ['Transfer & Mutual Transfer Modules', 'same zero-PII rules engine'],
+                    ['GPF (General Provident Fund) & Loans', 'balance check & local calculations'],
+                    ['Pension & Gratuity Tracking', 'automated retirement readiness'],
+                    ['Tour & Outstation Duty Approvals', 'sanction routing engine'],
+                    ['Government Cloud LLM Swap', 'NIC/MeghRaj self-hosted AI'],
                   ].map(([title, sub]) => (
                     <li key={title} className="flex items-start gap-2 text-slate-400">
-                      <span className="text-emerald-600 mt-0.5">•</span>
+                      <span className="text-purple-400 mt-0.5">•</span>
                       <span>
                         <strong className="text-slate-300">{title}</strong>
-                        {sub && <span className="text-slate-600"> ({sub})</span>}
+                        {sub && <span className="text-slate-500"> ({sub})</span>}
                       </span>
                     </li>
                   ))}
