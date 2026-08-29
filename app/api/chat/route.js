@@ -511,10 +511,6 @@ export function parseUserIntent(message = '', conversationHistory = [], document
     return { intent: 'apply_leave', leaveType, days, startDate, endDate };
   }
 
-  if (isApply && !text.includes('process') && !text.includes('rules') && !text.includes('how to')) {
-    return { intent: 'apply_leave', leaveType, days, startDate, endDate };
-  }
-
   if (isBalance && !text.includes('rule') && !text.includes('lapses')) {
     return { intent: 'check_balance', leaveType, days, startDate, endDate };
   }
