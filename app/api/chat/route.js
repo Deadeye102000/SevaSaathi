@@ -1286,18 +1286,23 @@ Aap kaunsi leave lena chahte hain?`;
 
     if (apiKey) {
       try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 4000);
+
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${apiKey}`,
           },
+          signal: controller.signal,
           body: JSON.stringify({
             model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
             messages: openAiMessages,
             temperature: 0.6,
           }),
         });
+        clearTimeout(timeoutId);
 
         if (response.ok) {
           const data = await response.json();

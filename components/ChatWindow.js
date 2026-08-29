@@ -234,7 +234,21 @@ export default function ChatWindow({ onDataBoundaryUpdate, onApplicationsUpdate,
       });
 
       if (!res.ok) {
-        throw new Error(`Server returned ${res.status}`);
+        if (res.status === 429) {
+          const errBody = await res.json().catch(() => ({}));
+          const rateMsg = errBody.reply || errBody.error || 'Aapne 1 minute mein 30 se adhik requests bheji hain. Kripya 1 minute baad try karein. (Rate limit: 30 req/min)';
+          setMessages((prev) => [...prev, {
+            id: `bot-${Date.now()}`,
+            sender: 'assistant',
+            text: rateMsg,
+            isError: true,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          }]);
+          setLoading(false);
+          return;
+        }
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(errBody.error || errBody.reply || `Server error (status ${res.status})`);
       }
 
       const data = await res.json();
@@ -319,10 +333,11 @@ export default function ChatWindow({ onDataBoundaryUpdate, onApplicationsUpdate,
       }
     } catch (err) {
       console.error('Failed to send message:', err);
+      const detail = err.message && !err.message.includes('object') ? ` (${err.message})` : ' (Connection error)';
       const errorMessage = {
         id: `bot-${Date.now()}`,
         sender: 'assistant',
-        text: 'क्षमा करें, सेवा में तकनीकी समस्या आई है। कृपया पुनः प्रयास करें। (Connection error)',
+        text: `क्षमा करें, सेवा में तकनीकी समस्या आई है। कृपया पुनः प्रयास करें।${detail}`,
         isError: true,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
