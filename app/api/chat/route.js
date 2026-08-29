@@ -1197,10 +1197,18 @@ Aap kaunsi leave lena chahte hain?`;
       } else {
         lastCreatedApplication = {
           id: submissionResult.application_id,
+          employee_name: employee?.name || 'Ravi Kumar',
+          employee_id: employee?.employee_id || 'UP-EHRMS-88213',
+          department: employee?.department || 'Basic Education',
+          posting_district: employee?.posting_district || 'Sitapur',
           type: draft.leaveType,
           days: draft.days,
+          startDate: submissionResult.startDate || draft.startDate || new Date().toISOString().split('T')[0],
+          endDate: submissionResult.endDate || draft.endDate || new Date().toISOString().split('T')[0],
+          dates: submissionResult.dates || draft.dates || (draft.startDate ? `${draft.startDate} to ${draft.endDate || draft.startDate}` : `${draft.days} Day(s)`),
           status: 'Submitted', // eHRMS first-state term
           routed_to: submissionResult.routed_to,
+          reporting_officer: submissionResult.routed_to || employee?.reporting_officer || 'Smt. Anita Sharma, BSA',
           documentAttached: docFlag,
           specialSanctionRequired: submissionResult.specialSanctionRequired || false,
           specialSanctionReason: submissionResult.specialSanctionReason || '',

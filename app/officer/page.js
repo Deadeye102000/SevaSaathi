@@ -297,8 +297,10 @@ export default function OfficerDashboardPage() {
                       <span className="font-medium text-slate-200">{app.days} Day(s)</span>
                     </div>
                     <div>
-                      <span className="text-slate-500 block text-[10px]">Leave Dates:</span>
-                      <span className="font-mono text-slate-300">{app.dates || (app.startDate ? `${app.startDate} to ${app.endDate}` : 'Requested')}</span>
+                      <span className="text-slate-500 block text-[10px]">Requested Dates:</span>
+                      <span className="font-mono font-semibold text-emerald-300 bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-800/40 inline-block mt-0.5">
+                        📅 {app.dates || (app.startDate ? `${app.startDate} to ${app.endDate}` : `${app.days} Day(s)`)}
+                      </span>
                     </div>
                     <div>
                       <span className="text-slate-500 block text-[10px]">Medical Document:</span>
