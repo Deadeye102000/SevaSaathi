@@ -54,8 +54,16 @@ export default function OfficerDashboardPage() {
     }
   };
 
+  const [activeOfficer, setActiveOfficer] = useState('all'); // 'all' | 'Anita' | 'Mishra' | 'Srivastava'
+
   const filteredApplications = applications.filter((app) => {
     const statusNorm = (app.status || 'Submitted').toLowerCase();
+    const officerStr = (app.reporting_officer || '').toLowerCase();
+
+    if (activeOfficer === 'Anita' && !officerStr.includes('anita') && !officerStr.includes('bsa')) return false;
+    if (activeOfficer === 'Mishra' && !officerStr.includes('mishra') && !officerStr.includes('cmo')) return false;
+    if (activeOfficer === 'Srivastava' && !officerStr.includes('srivastava') && !officerStr.includes('sdm')) return false;
+
     if (filter === 'submitted') return statusNorm === 'submitted';
     if (filter === 'approved') return statusNorm === 'approved';
     if (filter === 'action_needed') return statusNorm === 'submitted' || statusNorm === 'sent back';
@@ -143,6 +151,35 @@ export default function OfficerDashboardPage() {
             <span className="text-[11px] text-purple-400 font-medium">Sanctioning Officer</span>
             <div className="text-sm font-bold text-purple-300 mt-1 truncate">Smt. Anita Sharma</div>
             <span className="text-[10px] text-slate-500">BSA Sitapur</span>
+          </div>
+        </div>
+
+        {/* Officer Persona Selector */}
+        <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-2">
+          <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider block">
+            Select Sanctioning Officer Persona:
+          </label>
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 text-xs">
+            {[
+              { id: 'all', name: 'All Officers', dept: 'All UP Departments' },
+              { id: 'Anita', name: 'Smt. Anita Sharma, BSA', dept: 'Basic Education · Sitapur' },
+              { id: 'Mishra', name: 'Dr. R.K. Mishra, CMO', dept: 'Medical & Health · Lucknow' },
+              { id: 'Srivastava', name: 'Shri Alok Srivastava, SDM', dept: 'Revenue Dept · Barabanki' },
+            ].map((off) => (
+              <button
+                key={off.id}
+                type="button"
+                onClick={() => setActiveOfficer(off.id)}
+                className={`p-2.5 rounded-xl border text-left transition-all ${
+                  activeOfficer === off.id
+                    ? 'bg-purple-950/60 border-purple-500 text-white ring-1 ring-purple-500/40 shadow-sm'
+                    : 'bg-slate-950/40 hover:bg-slate-800/60 border-slate-800 text-slate-400'
+                }`}
+              >
+                <div className="font-bold truncate text-[11px]">{off.name}</div>
+                <div className="text-[10px] text-slate-500 truncate">{off.dept}</div>
+              </button>
+            ))}
           </div>
         </div>
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import ChatWindow from '@/components/ChatWindow';
 import DataBoundaryPanel from '@/components/DataBoundaryPanel';
@@ -9,6 +9,38 @@ export default function ChatPage() {
   const [activeDataBoundary, setActiveDataBoundary] = useState(null);
   const [mobileTab, setMobileTab] = useState('chat');
   const [isRoadmapOpen, setIsRoadmapOpen] = useState(false);
+
+  const [employeeInfo, setEmployeeInfo] = useState({
+    name: 'Ravi Kumar',
+    avatar: 'RK',
+    id: 'UP-EHRMS-88213',
+  });
+
+  useEffect(() => {
+    let currentEmp = 'UP-EHRMS-88213';
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      currentEmp = params.get('emp') || localStorage.getItem('sevasarthi_emp_id') || 'UP-EHRMS-88213';
+    }
+
+    fetch(`/api/chat?emp=${currentEmp}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.employee_name) {
+          const initials = data.employee_name
+            .split(' ')
+            .map((n) => n[0])
+            .join('')
+            .toUpperCase();
+          setEmployeeInfo({
+            name: data.employee_name,
+            avatar: initials,
+            id: data.employee_id || currentEmp,
+          });
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   return (
     <div className="min-h-screen flex flex-col bg-[#030712] text-slate-100 selection:bg-emerald-500/30">
@@ -70,11 +102,12 @@ export default function ChatPage() {
             <Link
               href="/login"
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-[11px] text-slate-300 hover:text-white transition-all"
+              title={`Logged in as ${employeeInfo.name} (${employeeInfo.id}). Click to switch account.`}
             >
               <div className="w-5 h-5 rounded-full bg-emerald-600/60 flex items-center justify-center text-[9px] font-bold text-white">
-                RK
+                {employeeInfo.avatar}
               </div>
-              <span className="hidden sm:inline">Ravi Kumar</span>
+              <span className="hidden sm:inline">{employeeInfo.name}</span>
             </Link>
           </div>
         </div>

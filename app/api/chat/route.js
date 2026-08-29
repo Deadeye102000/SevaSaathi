@@ -17,82 +17,60 @@ const EMPLOYEE_KEY = `employee:${DEFAULT_EMPLOYEE_ID}`;
 const APPLICATIONS_KEY = `employee:${DEFAULT_EMPLOYEE_ID}:applications`;
 
 // Fallback in-memory/file storage if Vercel KV environment variables are not set locally
-let inMemoryEmployeeStore = null;
+let inMemoryEmployeeStoreMap = {};
 let inMemoryApplicationsStore = {};
 
-function getFallbackDefaultEmployee() {
+function getFallbackDefaultEmployee(empId = 'UP-EHRMS-88213') {
+  const targetId = empId || 'UP-EHRMS-88213';
   try {
-    const filePath = path.join(process.cwd(), 'data', 'mock-employee.json');
+    const filePath = path.join(process.cwd(), 'data', 'mock-employees.json');
     if (fs.existsSync(filePath)) {
       const data = fs.readFileSync(filePath, 'utf-8');
       if (data.trim()) {
         const parsed = JSON.parse(data);
-        if (parsed && typeof parsed === 'object') {
-          return parsed;
+        if (parsed && parsed[targetId]) {
+          return parsed[targetId];
         }
       }
     }
   } catch (err) {
-    console.error('Error reading mock employee data:', err);
+    console.error('Error reading mock employees data:', err);
   }
+
+  try {
+    const singlePath = path.join(process.cwd(), 'data', 'mock-employee.json');
+    if (fs.existsSync(singlePath)) {
+      const single = JSON.parse(fs.readFileSync(singlePath, 'utf-8'));
+      if (single) return { ...single, employee_id: targetId };
+    }
+  } catch {}
+
   return {
     name: 'Ravi Kumar',
-    employee_id: DEFAULT_EMPLOYEE_ID,
+    employee_id: targetId,
     department: 'Basic Education',
     posting_district: 'Sitapur',
     posting_category: 'RURAL',
     reporting_officer: 'Smt. Anita Sharma, BSA',
-    leave_balance: {
-      casual: 8,
-      earned: 22,
-      medical: 12,
-    },
-    leave_history: [
-      {
-        id: 'LV-2026-0311',
-        type: 'casual',
-        days: 2,
-        status: 'Approved',
-        remark: 'Approved - enjoy your leave',
-        reporting_officer: 'Smt. Anita Sharma, BSA',
-        dates: '2026-06-14 to 2026-06-15',
-      },
-    ],
-    service_book: {
-      joining_date: '2019-07-15',
-      designation_history: [{ designation: 'Assistant Teacher', from: '2019-07-15', to: 'present' }],
-      postings: [{ school: 'GPS Sitapur East', district: 'Sitapur', from: '2019-07-15', to: 'present' }],
-      education: [{ qualification: 'B.Ed', institution: 'Lucknow University', year: 2018 }],
-    },
-    career_record: {
-      annual_appraisals: [{ year: 2025, rating: 'Very Good' }],
-      trainings_attended: [{ name: 'Digital Classroom Training', date: '2025-03-10' }],
-    },
-    property_return: {
-      last_filed_date: '2026-01-31',
-      status: 'Filed',
-      next_due_date: '2027-01-31',
-      assets_declared_count: 3,
-      assets_declared_detail: [{ type: 'Residential Property', location: 'Sitapur', value_declared: '₹18,00,000' }],
-    },
-    complaints: {
-      submitted: [],
-      status_note: 'No complaints on record',
-    },
+    leave_balance: { casual: 8, earned: 22, medical: 12 },
+    leave_history: [],
   };
 }
 
 /**
- * Retrieves the employee record from Vercel KV store (seeded with mock-employee.json if absent).
+ * Retrieves the employee record from Vercel KV store (seeded with mock-employees.json if absent).
  * Server-side only: this never goes to the client or the AI.
  */
-async function getEmployeeFromKV() {
+export async function getEmployeeFromKV(empId = 'UP-EHRMS-88213') {
+  const targetId = empId || 'UP-EHRMS-88213';
+  const key = `employee:${targetId}`;
+
   try {
     if (process.env.KV_REST_API_URL || process.env.VERCEL_KV_API_URL || process.env.KV_URL) {
-      let data = await kv.get(EMPLOYEE_KEY);
+      let data = await kv.get(key);
       if (!data) {
-        data = getFallbackDefaultEmployee();
-        await kv.set(EMPLOYEE_KEY, data);
+        data = getFallbackDefaultEmployee(targetId);
+        await kv.set(key, data);
       }
       return data;
     }
@@ -100,30 +78,33 @@ async function getEmployeeFromKV() {
     console.warn('Vercel KV get employee error (using fallback):', err.message);
   }
 
-  if (!inMemoryEmployeeStore) {
-    inMemoryEmployeeStore = getFallbackDefaultEmployee();
+  if (!inMemoryEmployeeStoreMap[targetId]) {
+    inMemoryEmployeeStoreMap[targetId] = getFallbackDefaultEmployee(targetId);
   }
-  return inMemoryEmployeeStore;
+  return inMemoryEmployeeStoreMap[targetId];
 }
 
 /**
  * Persists an updated employee record to Vercel KV store.
  */
-async function saveEmployeeToKV(employee) {
+export async function saveEmployeeToKV(employee) {
+  if (!employee || !employee.employee_id) return;
+  const targetId = employee.employee_id;
+  const key = `employee:${targetId}`;
+
   try {
     if (process.env.KV_REST_API_URL || process.env.VERCEL_KV_API_URL || process.env.KV_URL) {
-      await kv.set(EMPLOYEE_KEY, employee);
+      await kv.set(key, employee);
       return;
     }
   } catch (err) {
     console.warn('Vercel KV save employee error (using fallback):', err.message);
   }
-  inMemoryEmployeeStore = employee;
+  inMemoryEmployeeStoreMap[targetId] = employee;
 }
 
 /**
- * Persists a new leave application to Vercel KV store under application:LV-2026-XXXX
- * and appends the ID to employee:UP-EHRMS-88213:applications.
+ * Persists a new leave application to Vercel KV store under application:LV-2026-XXXX.
  */
 async function persistApplicationToKV(application) {
   try {
@@ -140,22 +121,26 @@ async function persistApplicationToKV(application) {
 }
 
 /**
- * Returns all leave applications for the reporting officer's dashboard.
+ * Returns all leave applications across all employees for the reporting officer's dashboard.
  */
 export async function getAllApplicationsFromKV() {
-  const employee = await getEmployeeFromKV();
+  const knownEmpIds = ['UP-EHRMS-88213', 'UP-EHRMS-94021', 'UP-EHRMS-72904'];
   const list = [];
 
-  if (Array.isArray(employee.leave_history)) {
-    for (const app of employee.leave_history) {
-      if (!list.some((a) => a.id === app.id)) {
-        list.push({
-          ...app,
-          employee_name: employee.name || 'Ravi Kumar',
-          employee_id: employee.employee_id || 'UP-EHRMS-88213',
-          department: employee.department || 'Basic Education',
-          posting_district: employee.posting_district || 'Sitapur',
-        });
+  for (const empId of knownEmpIds) {
+    const employee = await getEmployeeFromKV(empId);
+    if (employee && Array.isArray(employee.leave_history)) {
+      for (const app of employee.leave_history) {
+        if (!list.some((a) => a.id === app.id)) {
+          list.push({
+            ...app,
+            employee_name: employee.name || 'Employee',
+            employee_id: employee.employee_id || empId,
+            department: employee.department || 'Government Department',
+            posting_district: employee.posting_district || 'District Office',
+            reporting_officer: app.reporting_officer || employee.reporting_officer || 'Reporting Officer',
+          });
+        }
       }
     }
   }
@@ -164,10 +149,11 @@ export async function getAllApplicationsFromKV() {
     if (app && !list.some((a) => a.id === app.id)) {
       list.unshift({
         ...app,
-        employee_name: employee.name || 'Ravi Kumar',
-        employee_id: employee.employee_id || 'UP-EHRMS-88213',
-        department: employee.department || 'Basic Education',
-        posting_district: employee.posting_district || 'Sitapur',
+        employee_name: app.employee_name || 'Ravi Kumar',
+        employee_id: app.employee_id || 'UP-EHRMS-88213',
+        department: app.department || 'Basic Education',
+        posting_district: app.posting_district || 'Sitapur',
+        reporting_officer: app.reporting_officer || 'Reporting Officer',
       });
     }
   }
@@ -784,8 +770,15 @@ export async function POST(request) {
       );
     }
 
-    // 2. Load full employee record from Vercel KV store (seeded if absent)
-    const employee = await getEmployeeFromKV();
+    // 2. Load full employee record from Vercel KV store by employeeId
+    const urlObj = new URL(request.url);
+    let reqEmpId = urlObj.searchParams.get('emp') || request.headers.get('x-employee-id');
+    if (!reqEmpId && typeof formData !== 'undefined' && formData.get('employeeId')) {
+      reqEmpId = formData.get('employeeId').toString();
+    }
+    if (!reqEmpId) reqEmpId = 'UP-EHRMS-88213';
+
+    const employee = await getEmployeeFromKV(reqEmpId.toString());
 
     // 3. Parse intent
     const { intent, leaveType, days, startDate, endDate } = parseUserIntent(
@@ -1302,11 +1295,16 @@ Please let me know: which type of leave (Casual, Earned, or Medical) would you l
   }
 }
 
-export async function GET() {
-  const employee = await getEmployeeFromKV();
+export async function GET(request) {
+  const urlObj = new URL(request.url || 'http://localhost/api/chat');
+  const reqEmpId = urlObj.searchParams.get('emp') || request.headers.get('x-employee-id') || 'UP-EHRMS-88213';
+  const employee = await getEmployeeFromKV(reqEmpId.toString());
   return NextResponse.json({
     status: 'online',
     service: 'SevaSaathi Chat API',
+    employee_id: employee?.employee_id,
+    employee_name: employee?.name,
+    department: employee?.department,
     employeeConfigured: Boolean(employee && Object.keys(employee).length > 0),
     leave_balance: employee?.leave_balance || { casual: 8, earned: 22, medical: 12 },
     leave_history: employee?.leave_history || [],

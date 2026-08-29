@@ -85,14 +85,23 @@ export default function ChatWindow({ onDataBoundaryUpdate }) {
     medical: 12,
   });
 
+  const [employeeId, setEmployeeId] = useState('UP-EHRMS-88213');
+
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const fileInputRef = useRef(null);
   const recognitionRef = useRef(null);
 
-  // Sync server KV balances and initial boundary on mount
+  // Sync active employeeId from URL or localStorage on mount
   useEffect(() => {
-    fetch('/api/chat')
+    let currentEmp = 'UP-EHRMS-88213';
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      currentEmp = params.get('emp') || localStorage.getItem('sevasarthi_emp_id') || 'UP-EHRMS-88213';
+      setEmployeeId(currentEmp);
+    }
+
+    fetch(`/api/chat?emp=${currentEmp}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.leave_balance) {
@@ -211,6 +220,7 @@ export default function ChatWindow({ onDataBoundaryUpdate }) {
 
       const formData = new FormData();
       formData.append('message', text);
+      formData.append('employeeId', employeeId);
       formData.append('documentAttached', attachedFile ? 'true' : 'false');
       formData.append('conversationHistory', JSON.stringify(conversationHistory));
       formData.append('conversationState', JSON.stringify(conversationState));
@@ -221,8 +231,11 @@ export default function ChatWindow({ onDataBoundaryUpdate }) {
         formData.append('lastCreatedApplication', JSON.stringify(conversationState.lastCreatedApplication));
       }
 
-      const res = await fetch('/api/chat', {
+      const res = await fetch(`/api/chat?emp=${employeeId}`, {
         method: 'POST',
+        headers: {
+          'x-employee-id': employeeId,
+        },
         body: formData,
       });
 
@@ -243,7 +256,7 @@ export default function ChatWindow({ onDataBoundaryUpdate }) {
       }
 
       // Re-fetch KV balances to update quick balance widget
-      fetch('/api/chat')
+      fetch(`/api/chat?emp=${employeeId}`)
         .then((res) => res.json())
         .then((d) => {
           if (d.leave_balance) setBalances(d.leave_balance);
