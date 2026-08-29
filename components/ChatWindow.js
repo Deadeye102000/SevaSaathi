@@ -70,6 +70,13 @@ export default function ChatWindow({ onDataBoundaryUpdate }) {
   const [speechLang, setSpeechLang] = useState('hi-IN'); // 'hi-IN' or 'en-IN'
   const [fontSize, setFontSize] = useState('normal'); // 'normal' or 'large'
   const [showBalanceBar, setShowBalanceBar] = useState(true);
+  const [latestApplication, setLatestApplication] = useState({
+    id: 'LV-2026-0311',
+    type: 'casual',
+    days: 3,
+    status: 'Approved',
+    routed_to: 'Smt. Anita Sharma, BSA',
+  });
 
   const [conversationState, setConversationState] = useState({
     activeLeaveDraft: null,
@@ -90,14 +97,14 @@ export default function ChatWindow({ onDataBoundaryUpdate }) {
   const fileInputRef = useRef(null);
   const recognitionRef = useRef(null);
 
-  // Sync active employeeId from URL or localStorage on mount
+  // Sync balances and lastCreatedApplication from Vercel KV store
   useEffect(() => {
     let currentEmp = 'UP-EHRMS-88213';
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      currentEmp = params.get('emp') || localStorage.getItem('sevasarthi_emp_id') || 'UP-EHRMS-88213';
-      setEmployeeId(currentEmp);
-    }
+    try {
+      const stored = localStorage.getItem('sevasaathi_emp_id');
+      if (stored) currentEmp = stored;
+    } catch {}
+    setEmployeeId(currentEmp);
 
     fetch(`/api/chat?emp=${currentEmp}`)
       .then((res) => res.json())
@@ -111,6 +118,7 @@ export default function ChatWindow({ onDataBoundaryUpdate }) {
             ...prev,
             lastCreatedApplication: latest,
           }));
+          setLatestApplication(latest);
         }
       })
       .catch((err) => console.warn('Failed to fetch initial KV balances:', err));
@@ -272,13 +280,8 @@ export default function ChatWindow({ onDataBoundaryUpdate }) {
       // Detect status check or application creation in response
       const applicationCreated = data.lastCreatedApplication || (data.conversationState?.lastCreatedApplication);
 
-      // Status extraction for check_status responses
-      let statusToTrack = null;
       if (applicationCreated) {
-        statusToTrack = {
-          status: applicationCreated.status || 'Submitted',
-          officer: applicationCreated.routed_to || 'Smt. Anita Sharma, BSA',
-        };
+        setLatestApplication(applicationCreated);
       } else if (
         replyText.includes('Approved') ||
         replyText.includes('Submitted') ||
@@ -293,19 +296,23 @@ export default function ChatWindow({ onDataBoundaryUpdate }) {
           ? 'Rejected'
           : 'Submitted';
 
-        statusToTrack = {
+        setLatestApplication((prev) => ({
+          ...(prev || {
+            id: 'LV-2026-0311',
+            type: 'casual',
+            days: 3,
+            routed_to: 'Smt. Anita Sharma, BSA',
+          }),
           status: detectedStatus,
-          officer: 'Smt. Anita Sharma, BSA',
-        };
+          routed_to: 'Smt. Anita Sharma, BSA',
+        }));
       }
 
+      // Plain conversational text ONLY in chat message bubbles
       const botMessage = {
         id: `bot-${Date.now()}`,
         sender: 'assistant',
         text: replyText,
-        dataBoundary: data.dataBoundary,
-        applicationRecord: applicationCreated,
-        statusData: statusToTrack,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
 
@@ -474,14 +481,14 @@ Routed To: ${app.routed_to || 'Smt. Anita Sharma, BSA'}`;
         </div>
       </div>
 
-      {/* ── Live Leave Balances Bar (Visual Cards with "Last updated: just now") ── */}
+      {/* ── Live Leave Balances & Persistent Application Status / Slip Bar ── */}
       {showBalanceBar && (
-        <div className="px-4 py-2 bg-[#030712]/70 border-b border-slate-800/60 space-y-1 text-xs">
+        <div className="px-4 py-2.5 bg-[#030712]/70 border-b border-slate-800/60 space-y-2 text-xs">
           <div className="flex items-center justify-between px-0.5">
-            <span className="text-[10px] text-slate-500 font-mono">Leave Balances</span>
+            <span className="text-[10px] text-slate-500 font-mono">Leave Balances & Status</span>
             <span className="text-[10px] text-slate-500 font-mono">Last updated: just now</span>
           </div>
-          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800/80 shadow-sm flex flex-col justify-between">
               <span className="text-[10px] text-slate-400 font-medium">🌿 Casual Leave (CL)</span>
               <div className="flex items-baseline justify-between mt-1">
@@ -505,19 +512,50 @@ Routed To: ${app.routed_to || 'Smt. Anita Sharma, BSA'}`;
                 <span className="text-[9px] text-slate-500 font-mono">&gt;3d doc req</span>
               </div>
             </div>
+          </div>
 
-            <div className="hidden sm:flex p-2.5 rounded-xl bg-slate-900/90 border border-slate-800/80 shadow-sm flex-col justify-between">
-              <span className="text-[10px] text-slate-400 font-medium">📌 Last Record Status</span>
-              <div className="flex items-center justify-between mt-1">
-                <span className="text-[11px] font-semibold text-purple-300 truncate">
-                  {conversationState.lastCreatedApplication?.id || 'LV-2026-0311'}
-                </span>
-                <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold">
-                  {conversationState.lastCreatedApplication?.status || 'Approved'}
-                </span>
+          {/* Dedicated Status & Application Slip Panel */}
+          {latestApplication && (
+            <div className="p-3 rounded-xl bg-slate-900/95 border border-slate-800 shadow-md space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-emerald-400 text-xs font-bold">📄 Latest Application:</span>
+                  <span className="font-mono text-purple-300 font-bold text-xs">{latestApplication.id || 'LV-2026-0311'}</span>
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-[10px] border border-emerald-500/30">
+                    {latestApplication.status || 'Submitted'}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => handlePrintSlip(latestApplication)}
+                    className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-[11px] transition-all flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer"
+                  >
+                    <span>🖨️</span>
+                    <span>Print Slip</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleCopySlip(latestApplication)}
+                    className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-[11px] border border-slate-700 transition-all flex items-center gap-1 active:scale-95 cursor-pointer"
+                  >
+                    <span>📋</span>
+                    <span>Copy</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 4-Stage Horizontal Status Tracker */}
+              <div className="pt-0.5 border-t border-slate-800/80">
+                <StatusTracker
+                  currentStatus={latestApplication.status || 'Submitted'}
+                  officer={latestApplication.routed_to || latestApplication.officer || 'Smt. Anita Sharma, BSA'}
+                />
               </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 
@@ -543,7 +581,7 @@ Routed To: ${app.routed_to || 'Smt. Anita Sharma, BSA'}`;
                 {isUser ? 'You' : 'SS'}
               </div>
 
-              <div className="space-y-2 flex-1 min-w-0">
+              <div className="space-y-1 flex-1 min-w-0">
                 <div
                   className={`p-3.5 sm:p-4 rounded-2xl leading-relaxed whitespace-pre-wrap shadow-sm ${
                     isUser
@@ -555,75 +593,6 @@ Routed To: ${app.routed_to || 'Smt. Anita Sharma, BSA'}`;
                 >
                   {msg.text}
                 </div>
-
-                {/* Render Standalone StatusTracker when status data is present or created */}
-                {!isUser && msg.statusData && (
-                  <StatusTracker
-                    currentStatus={msg.statusData.status}
-                    officer={msg.statusData.officer}
-                  />
-                )}
-
-                {/* Render Official Application Slip Card when an application is submitted */}
-                {msg.applicationRecord && (
-                  <div className="p-4 rounded-xl bg-gradient-to-br from-slate-900 via-emerald-950/30 to-slate-900 border border-emerald-500/30 text-xs shadow-lg space-y-3">
-                    <div className="flex items-center justify-between border-b border-emerald-500/20 pb-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-emerald-400 text-base">📄</span>
-                        <h4 className="font-bold text-slate-100">Official eHRMS Leave Application Slip</h4>
-                      </div>
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-[10px] border border-emerald-500/40">
-                        {msg.applicationRecord.status || 'Submitted'}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2 text-[11px]">
-                      <div>
-                        <span className="text-slate-400 block">Application ID:</span>
-                        <span className="font-mono text-emerald-300 font-bold">{msg.applicationRecord.id}</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-400 block">Leave Type:</span>
-                        <span className="capitalize font-semibold text-slate-200">{msg.applicationRecord.type} Leave</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-400 block">Duration:</span>
-                        <span className="font-semibold text-slate-200">{msg.applicationRecord.days} Day(s)</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-400 block">Routed Authority:</span>
-                        <span className="font-semibold text-slate-200">{msg.applicationRecord.routed_to || 'Smt. Anita Sharma, BSA'}</span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 pt-2 border-t border-slate-800">
-                      <button
-                        type="button"
-                        onClick={() => handlePrintSlip(msg.applicationRecord)}
-                        className="flex-1 py-1.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-[11px] transition-colors flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
-                      >
-                        <span>🖨️</span>
-                        <span>Print Application Slip</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleCopySlip(msg.applicationRecord)}
-                        className="py-1.5 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium text-[11px] border border-slate-700 transition-colors flex items-center justify-center gap-1 active:scale-95"
-                      >
-                        <span>📋</span>
-                        <span>Copy</span>
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Inline Data Privacy Panel */}
-                {!isUser && msg.dataBoundary && (
-                  <div className="mt-2">
-                    <DataBoundaryPanel dataBoundary={msg.dataBoundary} isSidePanel={false} />
-                  </div>
-                )}
 
                 <div className={`text-[10px] text-slate-500 px-1 ${isUser ? 'text-right' : 'text-left'}`}>
                   {msg.timestamp}
