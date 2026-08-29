@@ -78,24 +78,40 @@ export default function ChatWindow({ onDataBoundaryUpdate }) {
     lastCreatedApplication: null,
   });
 
-  // Mock employee leave balances for quick bar
-  const balances = {
+  // Employee leave balances synced from server KV
+  const [balances, setBalances] = useState({
     casual: 8,
     earned: 22,
     medical: 12,
-  };
+  });
 
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const fileInputRef = useRef(null);
   const recognitionRef = useRef(null);
 
-  // Sync initial boundary to parent
+  // Sync server KV balances and initial boundary on mount
   useEffect(() => {
+    fetch('/api/chat')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.leave_balance) {
+          setBalances(data.leave_balance);
+        }
+        if (Array.isArray(data.leave_history) && data.leave_history.length > 0) {
+          const latest = data.leave_history[0];
+          setConversationState((prev) => ({
+            ...prev,
+            lastCreatedApplication: latest,
+          }));
+        }
+      })
+      .catch((err) => console.warn('Failed to fetch initial KV balances:', err));
+
     if (messages[0]?.dataBoundary && onDataBoundaryUpdate) {
       onDataBoundaryUpdate(messages[0].dataBoundary);
     }
-  }, [messages, onDataBoundaryUpdate]);
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -225,6 +241,14 @@ export default function ChatWindow({ onDataBoundaryUpdate }) {
           lastCreatedApplication: data.lastCreatedApplication !== undefined ? data.lastCreatedApplication : prev.lastCreatedApplication,
         }));
       }
+
+      // Re-fetch KV balances to update quick balance widget
+      fetch('/api/chat')
+        .then((res) => res.json())
+        .then((d) => {
+          if (d.leave_balance) setBalances(d.leave_balance);
+        })
+        .catch(() => {});
 
       if (data.requiresMedicalDocument) {
         setMedicalDocRequired(true);

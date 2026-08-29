@@ -10,11 +10,17 @@ import { checkLeaveEligibility, submitLeaveApplication } from '@/lib/rulesEngine
  * distributed serverless instances on Vercel.
  */
 
-/**
- * Loads the full mock employee record from /data/mock-employee.json.
- * Server-side only: this never goes to the client or the AI.
- */
-function getMockEmployee() {
+import { kv } from '@vercel/kv';
+
+const DEFAULT_EMPLOYEE_ID = 'UP-EHRMS-88213';
+const EMPLOYEE_KEY = `employee:${DEFAULT_EMPLOYEE_ID}`;
+const APPLICATIONS_KEY = `employee:${DEFAULT_EMPLOYEE_ID}:applications`;
+
+// Fallback in-memory/file storage if Vercel KV environment variables are not set locally
+let inMemoryEmployeeStore = null;
+let inMemoryApplicationsStore = {};
+
+function getFallbackDefaultEmployee() {
   try {
     const filePath = path.join(process.cwd(), 'data', 'mock-employee.json');
     if (fs.existsSync(filePath)) {
@@ -31,7 +37,7 @@ function getMockEmployee() {
   }
   return {
     name: 'Ravi Kumar',
-    employee_id: 'UP-EHRMS-88213',
+    employee_id: DEFAULT_EMPLOYEE_ID,
     department: 'Basic Education',
     posting_district: 'Sitapur',
     posting_category: 'RURAL',
@@ -74,6 +80,63 @@ function getMockEmployee() {
       status_note: 'No complaints on record',
     },
   };
+}
+
+/**
+ * Retrieves the employee record from Vercel KV store (seeded with mock-employee.json if absent).
+ * Server-side only: this never goes to the client or the AI.
+ */
+async function getEmployeeFromKV() {
+  try {
+    if (process.env.KV_REST_API_URL || process.env.VERCEL_KV_API_URL || process.env.KV_URL) {
+      let data = await kv.get(EMPLOYEE_KEY);
+      if (!data) {
+        data = getFallbackDefaultEmployee();
+        await kv.set(EMPLOYEE_KEY, data);
+      }
+      return data;
+    }
+  } catch (err) {
+    console.warn('Vercel KV get employee error (using fallback):', err.message);
+  }
+
+  if (!inMemoryEmployeeStore) {
+    inMemoryEmployeeStore = getFallbackDefaultEmployee();
+  }
+  return inMemoryEmployeeStore;
+}
+
+/**
+ * Persists an updated employee record to Vercel KV store.
+ */
+async function saveEmployeeToKV(employee) {
+  try {
+    if (process.env.KV_REST_API_URL || process.env.VERCEL_KV_API_URL || process.env.KV_URL) {
+      await kv.set(EMPLOYEE_KEY, employee);
+      return;
+    }
+  } catch (err) {
+    console.warn('Vercel KV save employee error (using fallback):', err.message);
+  }
+  inMemoryEmployeeStore = employee;
+}
+
+/**
+ * Persists a new leave application to Vercel KV store under application:LV-2026-XXXX
+ * and appends the ID to employee:UP-EHRMS-88213:applications.
+ */
+async function persistApplicationToKV(application) {
+  try {
+    if (process.env.KV_REST_API_URL || process.env.VERCEL_KV_API_URL || process.env.KV_URL) {
+      await kv.set(`application:${application.id}`, application);
+      try {
+        await kv.lpush(APPLICATIONS_KEY, application.id);
+      } catch {}
+    }
+  } catch (err) {
+    console.warn('Vercel KV persist application error:', err.message);
+  }
+  inMemoryApplicationsStore[application.id] = application;
 }
 
 /**
@@ -594,8 +657,8 @@ export async function POST(request) {
       );
     }
 
-    // 2. Load full mock employee record (server-side only, NEVER sent to client or AI)
-    const employee = getMockEmployee();
+    // 2. Load full employee record from Vercel KV store (seeded if absent)
+    const employee = await getEmployeeFromKV();
 
     // 3. Parse intent
     const { intent, leaveType, days, startDate, endDate } = parseUserIntent(
@@ -912,10 +975,25 @@ Please let me know: which type of leave (Casual, Earned, or Medical) would you l
         };
         activeLeaveDraft = null;
 
+        // Deduct leave balance in employee record & update leave_history
+        const normType = (draft.leaveType || 'casual').toLowerCase();
+        if (employee.leave_balance && typeof employee.leave_balance[normType] === 'number') {
+          employee.leave_balance[normType] = Math.max(0, employee.leave_balance[normType] - Number(draft.days));
+        }
+
+        if (!Array.isArray(employee.leave_history)) {
+          employee.leave_history = [];
+        }
+        employee.leave_history.unshift(lastCreatedApplication);
+
+        // Persist updated employee record & new application object in Vercel KV
+        await saveEmployeeToKV(employee);
+        await persistApplicationToKV(lastCreatedApplication);
+
         derivedPayload = {
           leave_type: draft.leaveType,
           days_requested: draft.days,
-          current_balance: draft.current_balance ?? 8,
+          current_balance: employee.leave_balance?.[normType] ?? draft.current_balance ?? 8,
           eligible: true,
           posting_category: employee?.posting_category || 'RURAL',
           status: 'Submitted',
@@ -1081,10 +1159,12 @@ Please let me know: which type of leave (Casual, Earned, or Medical) would you l
 }
 
 export async function GET() {
-  const employee = getMockEmployee();
+  const employee = await getEmployeeFromKV();
   return NextResponse.json({
     status: 'online',
     service: 'SevaSaathi Chat API',
     employeeConfigured: Boolean(employee && Object.keys(employee).length > 0),
+    leave_balance: employee?.leave_balance || { casual: 8, earned: 22, medical: 12 },
+    leave_history: employee?.leave_history || [],
   });
 }
