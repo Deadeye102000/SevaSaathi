@@ -1360,7 +1360,8 @@ Aap kaunsi leave lena chahte hain?`;
     if (submissionResult && submissionResult.application_id) {
       const routingOfficer =
         submissionResult.routed_to || employee?.reporting_officer || 'Reporting Officer';
-      let details = `\n\nApplication ID: ${submissionResult.application_id}, Status: Submitted, sent to ${routingOfficer}`;
+      const datesInfo = submissionResult.dates || (submissionResult.startDate ? `${submissionResult.startDate} to ${submissionResult.endDate}` : `${submissionResult.days} Day(s)`);
+      let details = `\n\nApplication ID: ${submissionResult.application_id}, Status: Submitted, Requested Dates: ${datesInfo}, Sent to: ${routingOfficer}`;
       if (submissionResult.documentAttached || submissionResult.leaveType === 'medical') {
         details += `\nMedical certificate: attached.`;
       }
