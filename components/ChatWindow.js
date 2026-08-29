@@ -50,7 +50,7 @@ const PROMPT_GROUPS = [
  * ChatWindow Component
  * Practical UI for UP Government Employees (eHRMS Manav Sampada).
  */
-export default function ChatWindow({ onDataBoundaryUpdate }) {
+export default function ChatWindow({ onDataBoundaryUpdate, onApplicationsUpdate, onOpenApplicationsTab }) {
   const [messages, setMessages] = useState([
     {
       id: 'welcome-msg',
@@ -321,6 +321,14 @@ export default function ChatWindow({ onDataBoundaryUpdate }) {
       if (data.dataBoundary && onDataBoundaryUpdate) {
         onDataBoundaryUpdate(data.dataBoundary);
       }
+
+      if (onApplicationsUpdate) {
+        if (applicationCreated) {
+          onApplicationsUpdate(applicationCreated);
+        } else {
+          onApplicationsUpdate();
+        }
+      }
     } catch (err) {
       console.error('Failed to send message:', err);
       const errorMessage = {
@@ -481,12 +489,21 @@ Routed To: ${app.routed_to || 'Smt. Anita Sharma, BSA'}`;
         </div>
       </div>
 
-      {/* ── Live Leave Balances & Persistent Application Status / Slip Bar ── */}
+      {/* ── Live Leave Balances Bar ── */}
       {showBalanceBar && (
-        <div className="px-4 py-2.5 bg-[#030712]/70 border-b border-slate-800/60 space-y-2 text-xs">
+        <div className="px-4 py-2 bg-[#030712]/70 border-b border-slate-800/60 space-y-1.5 text-xs">
           <div className="flex items-center justify-between px-0.5">
-            <span className="text-[10px] text-slate-500 font-mono">Leave Balances & Status</span>
-            <span className="text-[10px] text-slate-500 font-mono">Last updated: just now</span>
+            <span className="text-[10px] text-slate-500 font-mono">Leave Balances</span>
+            {onOpenApplicationsTab && (
+              <button
+                type="button"
+                onClick={onOpenApplicationsTab}
+                className="text-[10px] text-emerald-400 hover:text-emerald-300 font-medium flex items-center gap-1 bg-emerald-500/10 hover:bg-emerald-500/20 px-2 py-0.5 rounded-full border border-emerald-500/20 transition-all cursor-pointer"
+              >
+                <span>📑</span>
+                <span>View Applications</span>
+              </button>
+            )}
           </div>
           <div className="grid grid-cols-3 gap-2">
             <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800/80 shadow-sm flex flex-col justify-between">
@@ -513,49 +530,6 @@ Routed To: ${app.routed_to || 'Smt. Anita Sharma, BSA'}`;
               </div>
             </div>
           </div>
-
-          {/* Dedicated Status & Application Slip Panel */}
-          {latestApplication && (
-            <div className="p-3 rounded-xl bg-slate-900/95 border border-slate-800 shadow-md space-y-2">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-emerald-400 text-xs font-bold">📄 Latest Application:</span>
-                  <span className="font-mono text-purple-300 font-bold text-xs">{latestApplication.id || 'LV-2026-0311'}</span>
-                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-[10px] border border-emerald-500/30">
-                    {latestApplication.status || 'Submitted'}
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => handlePrintSlip(latestApplication)}
-                    className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-[11px] transition-all flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer"
-                  >
-                    <span>🖨️</span>
-                    <span>Print Slip</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleCopySlip(latestApplication)}
-                    className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-[11px] border border-slate-700 transition-all flex items-center gap-1 active:scale-95 cursor-pointer"
-                  >
-                    <span>📋</span>
-                    <span>Copy</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* 4-Stage Horizontal Status Tracker */}
-              <div className="pt-0.5 border-t border-slate-800/80">
-                <StatusTracker
-                  currentStatus={latestApplication.status || 'Submitted'}
-                  officer={latestApplication.routed_to || latestApplication.officer || 'Smt. Anita Sharma, BSA'}
-                />
-              </div>
-            </div>
-          )}
         </div>
       )}
 

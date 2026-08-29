@@ -496,19 +496,32 @@ export function parseUserIntent(message = '', conversationHistory = [], document
     /\b(balance|remaining|how many days|how much leave|available|left|kitna|kitni|shesh|bachi)\b/i.test(text) ||
     /बैलेंस|बची|शेष|कितनी/i.test(text);
 
+  const hasExplicitDate =
+    dates.length > 0 ||
+    _startOffset !== 0 ||
+    /\b(kal|aaj|today|tomorrow|somvar|mangalvar|budhvar|guruvar|shukravar|shanivar|ravivar|monday|tuesday|wednesday|thursday|friday|saturday|sunday|hafte|hafta|next week)\b/i.test(message) ||
+    /(\d{1,2})\s*(?:तारीख|ता०|से|को|अक्टूबर|सितंबर|अगस्त|जनवरी|फरवरी|मार्च|अप्रैल|मई|जून|जुलाई|नवंबर|दिसंबर)/u.test(message);
+
   // STEP 1: If user asks to apply or check leaves but specifies NEITHER leave type NOR days (and no pending type):
   if (!hasExplicitLeaveType && !pendingLeaveType && (isGeneralLeaveQuery || isApply || isBalance)) {
     return { intent: 'ask_leave_type', leaveType: 'casual', days: 0, startDate, endDate };
   }
 
   // STEP 2: If leave type is known (or pending), but days not yet given in this message or previously:
-  if (isApply && hasExplicitLeaveType && !hasExplicitDays) {
+  if (isApply && (hasExplicitLeaveType || pendingLeaveType) && !hasExplicitDays && !pendingDays) {
     return { intent: 'ask_leave_days', leaveType, days: 0, startDate, endDate };
   }
 
-  // STEP 3 / SHORTCUT: Both leave type AND days known!
+  // STEP 3: If leave type and days are known, but date is missing:
+  if (isApply && (hasExplicitDays || pendingDays) && !hasExplicitDate) {
+    const finalDays = hasExplicitDays ? days : (pendingDays || 1);
+    return { intent: 'ask_leave_date', leaveType, days: finalDays, startDate, endDate };
+  }
+
+  // STEP 4 / SHORTCUT: Leave type, days AND dates known!
   if (isApply && !text.includes('process') && !text.includes('rules') && !text.includes('how to')) {
-    return { intent: 'apply_leave', leaveType, days, startDate, endDate };
+    const finalDays = hasExplicitDays ? days : (pendingDays || 1);
+    return { intent: 'apply_leave', leaveType, days: finalDays, startDate, endDate };
   }
 
   if (isBalance && !text.includes('rule') && !text.includes('lapses')) {
@@ -861,7 +874,7 @@ export async function POST(request) {
     // check_property_return, check_complaints, check_capabilities, ask_leave_type so they NEVER call OpenAI API.
     // They read full records directly on-premise from local mock-employee.json,
     // construct local response templates, and return sentToAI: null with full staysLocal record.
-    if (['check_service_book', 'check_career_record', 'check_property_return', 'check_complaints', 'check_capabilities', 'ask_leave_type', 'ask_leave_days', 'greeting', 'out_of_scope'].includes(intent)) {
+    if (['check_service_book', 'check_career_record', 'check_property_return', 'check_complaints', 'check_capabilities', 'ask_leave_type', 'ask_leave_days', 'ask_leave_date', 'greeting', 'out_of_scope'].includes(intent)) {
       const isDevanagari = /[\u0900-\u097F]/.test(message);
       let localReply = '';
       let accessedLocalRecord = {};
@@ -1055,6 +1068,24 @@ Aap kaunsi leave lena chahte hain?`;
           intent_handled: `ask_leave_days (${leaveType}) — local only, 0 bytes sent to AI`,
           balance_shown: `${leaveType}: ${balance} days`,
         };
+      } else if (intent === 'ask_leave_date') {
+        const leaveNameEn =
+          leaveType === 'earned'  ? 'Earned Leave'
+          : leaveType === 'medical' ? 'Medical Leave'
+          : 'Casual Leave';
+        const leaveNameHi =
+          leaveType === 'earned'  ? 'उपार्जित अवकाश (Earned Leave)'
+          : leaveType === 'medical' ? 'चिकित्सा अवकाश (Medical Leave)'
+          : 'आकस्मिक अवकाश (Casual Leave)';
+
+        localReply = isDevanagari
+          ? `ठीक है, ${days} दिन की ${leaveNameHi}। कृपया अवकाश प्रारंभ की तारीख (start date) बताएं? (जैसे '15 सितंबर से' या 'कल से')`
+          : `Theek hai, ${days} day(s) of ${leaveNameEn}. Kripya chhutti ki shuruat ki tareekh (start date) batayein? (e.g. '15 September se' ya 'kal se')`;
+
+        accessedLocalRecord = {
+          intent_handled: `ask_leave_date (${leaveType}, ${days} days) — local only, 0 bytes sent to AI`,
+          prompt_for_date: 'Waiting for employee start date selection',
+        };
       }
 
       await logAuditEventToKV({
@@ -1065,7 +1096,8 @@ Aap kaunsi leave lena chahte hain?`;
         response_summary: localReply.slice(0, 120),
       });
 
-      const nextPendingType = intent === 'ask_leave_days' ? leaveType : null;
+      const nextPendingType = (intent === 'ask_leave_days' || intent === 'ask_leave_date') ? leaveType : null;
+      const nextPendingDays = intent === 'ask_leave_date' ? days : null;
 
       return NextResponse.json({
         aiMessage: localReply,
@@ -1075,12 +1107,12 @@ Aap kaunsi leave lena chahte hain?`;
           activeLeaveDraft,
           lastCreatedApplication,
           pendingLeaveType: nextPendingType,
-          pendingDays: null,
+          pendingDays: nextPendingDays,
         },
         activeLeaveDraft,
         lastCreatedApplication,
         pendingLeaveType: nextPendingType,
-        pendingDays: null,
+        pendingDays: nextPendingDays,
         dataBoundary: {
           staysLocal: {
             name: employee?.name || '',

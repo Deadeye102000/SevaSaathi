@@ -1,14 +1,17 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import ChatWindow from '@/components/ChatWindow';
 import DataBoundaryPanel from '@/components/DataBoundaryPanel';
+import ApplicationsPanel from '@/components/ApplicationsPanel';
 
 export default function ChatPage() {
   const [activeDataBoundary, setActiveDataBoundary] = useState(null);
-  const [mobileTab, setMobileTab] = useState('chat');
+  const [mobileTab, setMobileTab] = useState('chat'); // 'chat' | 'applications' | 'boundary'
+  const [sideTab, setSideTab] = useState('applications'); // 'applications' | 'boundary'
   const [isRoadmapOpen, setIsRoadmapOpen] = useState(false);
+  const [applications, setApplications] = useState([]);
 
   const [employeeInfo, setEmployeeInfo] = useState({
     name: 'Ravi Kumar',
@@ -16,14 +19,8 @@ export default function ChatPage() {
     id: 'UP-EHRMS-88213',
   });
 
-  useEffect(() => {
-    let currentEmp = 'UP-EHRMS-88213';
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      currentEmp = params.get('emp') || localStorage.getItem('sevasarthi_emp_id') || 'UP-EHRMS-88213';
-    }
-
-    fetch(`/api/chat?emp=${currentEmp}`)
+  const fetchEmployeeData = useCallback((empId) => {
+    fetch(`/api/chat?emp=${empId}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.employee_name) {
@@ -35,12 +32,43 @@ export default function ChatPage() {
           setEmployeeInfo({
             name: data.employee_name,
             avatar: initials,
-            id: data.employee_id || currentEmp,
+            id: data.employee_id || empId,
           });
+        }
+        if (Array.isArray(data.leave_history)) {
+          setApplications(data.leave_history);
         }
       })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    let currentEmp = 'UP-EHRMS-88213';
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      currentEmp = params.get('emp') || localStorage.getItem('sevasarthi_emp_id') || 'UP-EHRMS-88213';
+    }
+    fetchEmployeeData(currentEmp);
+  }, [fetchEmployeeData]);
+
+  const handleApplicationsUpdate = (newApp) => {
+    if (newApp && newApp.id) {
+      setApplications((prev) => {
+        const exists = prev.some((a) => a.id === newApp.id);
+        if (exists) {
+          return prev.map((a) => (a.id === newApp.id ? { ...a, ...newApp } : a));
+        }
+        return [newApp, ...prev];
+      });
+    } else {
+      fetchEmployeeData(employeeInfo.id);
+    }
+  };
+
+  const handleOpenApplicationsTab = () => {
+    setSideTab('applications');
+    setMobileTab('applications');
+  };
 
   return (
     <div className="min-h-screen flex flex-col bg-[#030712] text-slate-100 selection:bg-emerald-500/30">
@@ -114,19 +142,22 @@ export default function ChatPage() {
 
         {/* Mobile tab bar */}
         <div className="lg:hidden px-4 pb-2 flex items-center gap-2">
-          {['chat', 'boundary'].map((tab) => (
+          {[
+            { id: 'chat', label: '💬 Chat' },
+            { id: 'applications', label: `📑 Applications (${applications.length})` },
+            { id: 'boundary', label: '🔒 Data Boundary' },
+          ].map((tab) => (
             <button
-              key={tab}
-              id={`mobile-tab-${tab}`}
-              onClick={() => setMobileTab(tab)}
-              className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5 ${
-                mobileTab === tab
+              key={tab.id}
+              id={`mobile-tab-${tab.id}`}
+              onClick={() => setMobileTab(tab.id)}
+              className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-medium transition-all flex items-center justify-center gap-1 ${
+                mobileTab === tab.id
                   ? 'bg-white/[0.08] text-emerald-400 border border-white/10'
                   : 'text-slate-500 hover:text-slate-300'
               }`}
             >
-              <span>{tab === 'chat' ? '💬' : '🔒'}</span>
-              <span>{tab === 'chat' ? 'Chat' : 'Data Boundary'}</span>
+              <span>{tab.label}</span>
             </button>
           ))}
         </div>
@@ -138,20 +169,70 @@ export default function ChatPage() {
 
           {/* Chat panel */}
           <section
-            className={`lg:col-span-8 flex flex-col h-[calc(100dvh-11rem)] lg:h-[calc(100vh-11rem)] ${
+            className={`lg:col-span-7 flex flex-col h-[calc(100dvh-11rem)] lg:h-[calc(100vh-11rem)] ${
               mobileTab === 'chat' ? 'flex' : 'hidden lg:flex'
             }`}
           >
-            <ChatWindow onDataBoundaryUpdate={setActiveDataBoundary} />
+            <ChatWindow
+              onDataBoundaryUpdate={setActiveDataBoundary}
+              onApplicationsUpdate={handleApplicationsUpdate}
+              onOpenApplicationsTab={handleOpenApplicationsTab}
+            />
           </section>
 
-          {/* Sidebar */}
+          {/* Dedicated Side Panel with Tabs: Leave Applications | Data Boundary */}
           <section
-            className={`lg:col-span-4 flex flex-col h-[calc(100dvh-11rem)] lg:h-[calc(100vh-11rem)] overflow-y-auto ${
-              mobileTab === 'boundary' ? 'flex' : 'hidden lg:flex'
+            className={`lg:col-span-5 flex flex-col h-[calc(100dvh-11rem)] lg:h-[calc(100vh-11rem)] overflow-hidden ${
+              mobileTab !== 'chat' ? 'flex' : 'hidden lg:flex'
             }`}
           >
-            <DataBoundaryPanel dataBoundary={activeDataBoundary} isSidePanel={true} />
+            {/* Desktop Side Panel Tabs Navigation */}
+            <div className="flex items-center gap-2 pb-2 flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setSideTab('applications');
+                  setMobileTab('applications');
+                }}
+                className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  (mobileTab === 'applications' || (mobileTab === 'chat' && sideTab === 'applications'))
+                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-950/40 border border-emerald-500/30'
+                    : 'bg-slate-900/80 text-slate-400 hover:text-slate-200 border border-slate-800'
+                }`}
+              >
+                <span>📑</span>
+                <span>Leave Applications ({applications.length})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setSideTab('boundary');
+                  setMobileTab('boundary');
+                }}
+                className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  (mobileTab === 'boundary' || (mobileTab === 'chat' && sideTab === 'boundary'))
+                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-950/40 border border-emerald-500/30'
+                    : 'bg-slate-900/80 text-slate-400 hover:text-slate-200 border border-slate-800'
+                }`}
+              >
+                <span>🔒</span>
+                <span>Data Boundary</span>
+              </button>
+            </div>
+
+            {/* Tab Content */}
+            <div className="flex-1 overflow-y-auto min-h-0">
+              {(mobileTab === 'applications' || (mobileTab === 'chat' && sideTab === 'applications')) ? (
+                <ApplicationsPanel
+                  applications={applications}
+                  employeeName={employeeInfo.name}
+                  employeeId={employeeInfo.id}
+                />
+              ) : (
+                <DataBoundaryPanel dataBoundary={activeDataBoundary} isSidePanel={true} />
+              )}
+            </div>
           </section>
         </div>
 
