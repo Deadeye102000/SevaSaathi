@@ -139,6 +139,55 @@ async function persistApplicationToKV(application) {
   inMemoryApplicationsStore[application.id] = application;
 }
 
+let inMemoryAuditLog = [];
+
+/**
+ * Persists an audit log entry to Vercel KV store (under list key 'audit_log')
+ * with fallback to inMemoryAuditLog array.
+ */
+export async function logAuditEventToKV(entry) {
+  const auditEntry = {
+    id: `aud_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    timestamp: new Date().toISOString(),
+    intent: entry.intent || 'unknown',
+    api_call_made: Boolean(entry.api_call_made),
+    payload_sent: entry.payload_sent ?? null,
+    model: entry.model || (entry.api_call_made ? 'gpt-4o-mini' : 'none (local response)'),
+    response_summary: (entry.response_summary || '').toString().slice(0, 120),
+  };
+
+  try {
+    if (process.env.KV_REST_API_URL || process.env.VERCEL_KV_API_URL || process.env.KV_URL) {
+      await kv.lpush('audit_log', auditEntry);
+      await kv.ltrim('audit_log', 0, 99);
+    }
+  } catch (err) {
+    console.warn('Vercel KV audit log error (using fallback):', err.message);
+  }
+
+  inMemoryAuditLog.unshift(auditEntry);
+  if (inMemoryAuditLog.length > 100) {
+    inMemoryAuditLog = inMemoryAuditLog.slice(0, 100);
+  }
+}
+
+/**
+ * Reads up to 50 audit log entries from Vercel KV store or local memory fallback.
+ */
+export async function getAuditLogsFromKV() {
+  try {
+    if (process.env.KV_REST_API_URL || process.env.VERCEL_KV_API_URL || process.env.KV_URL) {
+      const logs = await kv.lrange('audit_log', 0, 49);
+      if (Array.isArray(logs) && logs.length > 0) {
+        return logs;
+      }
+    }
+  } catch (err) {
+    console.warn('Vercel KV get audit log error:', err.message);
+  }
+  return inMemoryAuditLog.slice(0, 50);
+}
+
 /**
  * Normalizes Hinglish and Hindi word-numbers to digit equivalents
  * so downstream regexes can parse them consistently.
@@ -870,6 +919,14 @@ Please let me know: which type of leave (Casual, Earned, or Medical) would you l
         };
       }
 
+      await logAuditEventToKV({
+        intent,
+        api_call_made: false,
+        payload_sent: null,
+        model: 'none (local response)',
+        response_summary: localReply.slice(0, 120),
+      });
+
       return NextResponse.json({
         aiMessage: localReply,
         reply: localReply,
@@ -1123,6 +1180,15 @@ Please let me know: which type of leave (Casual, Earned, or Medical) would you l
       }
       finalAiMessage = `${finalAiMessage}${details}`;
     }
+
+    // Log audit event to Vercel KV
+    await logAuditEventToKV({
+      intent,
+      api_call_made: Boolean(process.env.OPENAI_API_KEY && intent !== 'restricted'),
+      payload_sent: derivedPayload,
+      model: process.env.OPENAI_API_KEY && intent !== 'restricted' ? (process.env.OPENAI_MODEL || 'gpt-4o-mini') : 'none (local response)',
+      response_summary: finalAiMessage.slice(0, 120),
+    });
 
     // 8. Return to client with strict data boundary and document upload indicator
     return NextResponse.json({

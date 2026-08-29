@@ -47,8 +47,17 @@ export default function ChatPage() {
             </div>
           </div>
 
-          {/* Right: User chip */}
+          {/* Right: User chip & Audit link */}
           <div className="flex items-center gap-2 flex-shrink-0">
+            <Link
+              href="/audit"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-[11px] font-medium transition-all"
+              title="View Real-Time Compliance Audit Log"
+            >
+              <span>🔍</span>
+              <span className="hidden sm:inline">Live Audit Log</span>
+            </Link>
+
             <Link
               href="/login"
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-[11px] text-slate-300 hover:text-white transition-all"
