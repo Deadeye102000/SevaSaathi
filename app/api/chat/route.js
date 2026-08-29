@@ -324,7 +324,7 @@ function resolveRelativeDateOffset(message) {
  * Parses user message into structured intent and parameters,
  * supporting multi-turn drafts, Hindi/English inputs, and document requirements.
  */
-export function parseUserIntent(message = '', conversationHistory = [], documentAttached = false, activeLeaveDraft = null) {
+export function parseUserIntent(message = '', conversationHistory = [], documentAttached = false, activeLeaveDraft = null, pendingLeaveType = null) {
   // Normalize Hinglish/Hindi word-numbers to digits before any regex matching
   const text = normalizeWordNumbers(message.toLowerCase().trim());
 
@@ -451,6 +451,9 @@ export function parseUserIntent(message = '', conversationHistory = [], document
   ) {
     leaveType = 'casual';
     hasExplicitLeaveType = true;
+  } else if (pendingLeaveType) {
+    leaveType = pendingLeaveType;
+    hasExplicitLeaveType = true;
   }
 
   // 7. Detect days (word-numbers already normalized by normalizeWordNumbers above)
@@ -485,21 +488,27 @@ export function parseUserIntent(message = '', conversationHistory = [], document
 
   const isApply =
     /\b(apply|application|request|take|avail|need|want|chahiye|chhutti|chutti|leni|lena|daalni)\b/i.test(text) ||
-    /चाहिए|आवेदन|लेनी|लेना|डालनी|छुट्टी/i.test(text);
+    /चाहिए|आवेदन|लेनी|लेना|डालनी|छुट्टी/i.test(text) ||
+    hasExplicitLeaveType ||
+    Boolean(pendingLeaveType);
 
   const isBalance =
     /\b(balance|remaining|how many days|how much leave|available|left|kitna|kitni|shesh|bachi)\b/i.test(text) ||
     /बैलेंस|बची|शेष|कितनी/i.test(text);
 
-  // If user asks to apply or check leaves but has NOT specified the type (Casual, Earned, Medical):
-  // Show all leaves and ask first what type of leave the employee wants to apply for!
-  if (!hasExplicitLeaveType && (isGeneralLeaveQuery || isApply || isBalance)) {
-    return { intent: 'ask_leave_type', leaveType: 'casual', days, startDate, endDate };
+  // STEP 1: If user asks to apply or check leaves but specifies NEITHER leave type NOR days (and no pending type):
+  if (!hasExplicitLeaveType && !pendingLeaveType && (isGeneralLeaveQuery || isApply || isBalance)) {
+    return { intent: 'ask_leave_type', leaveType: 'casual', days: 0, startDate, endDate };
   }
 
-  // If user named a leave type but gave no explicit duration/dates: ask before drafting
+  // STEP 2: If leave type is known (or pending), but days not yet given in this message or previously:
   if (isApply && hasExplicitLeaveType && !hasExplicitDays) {
     return { intent: 'ask_leave_days', leaveType, days: 0, startDate, endDate };
+  }
+
+  // STEP 3 / SHORTCUT: Both leave type AND days known!
+  if (isApply && !text.includes('process') && !text.includes('rules') && !text.includes('how to')) {
+    return { intent: 'apply_leave', leaveType, days, startDate, endDate };
   }
 
   if (isApply && !text.includes('process') && !text.includes('rules') && !text.includes('how to')) {
@@ -796,6 +805,8 @@ export async function POST(request) {
           if (parsed && typeof parsed === 'object') {
             activeLeaveDraft = parsed.activeLeaveDraft ?? null;
             lastCreatedApplication = parsed.lastCreatedApplication ?? null;
+            pendingLeaveType = parsed.pendingLeaveType ?? null;
+            pendingDays = parsed.pendingDays ?? null;
           }
         } catch {}
       }
@@ -818,6 +829,8 @@ export async function POST(request) {
       const convState = body.conversationState || {};
       activeLeaveDraft = convState.activeLeaveDraft ?? body.activeLeaveDraft ?? null;
       lastCreatedApplication = convState.lastCreatedApplication ?? body.lastCreatedApplication ?? null;
+      pendingLeaveType = convState.pendingLeaveType ?? body.pendingLeaveType ?? null;
+      pendingDays = convState.pendingDays ?? body.pendingDays ?? null;
     }
 
     if (!message || typeof message !== 'string' || !message.trim()) {
@@ -842,7 +855,8 @@ export async function POST(request) {
       message,
       conversationHistory,
       documentAttached,
-      activeLeaveDraft
+      activeLeaveDraft,
+      pendingLeaveType
     );
 
     // 3A. READ-ONLY INTENTS: Intercept check_service_book, check_career_record,
@@ -996,20 +1010,18 @@ export async function POST(request) {
         const ml = employee?.leave_balance?.medical ?? 12;
 
         localReply = isDevanagari
-          ? `नमस्ते! आपके मानव संपदा eHRMS रिकॉर्ड में वर्तमान में निम्नलिखित अवकाश उपलब्ध हैं:
+          ? `नमस्ते! आपके पास ये अवकाश विकल्प उपलब्ध हैं:
+🌿 Casual Leave: ${cl} दिन उपलब्ध
+💼 Earned Leave: ${el} दिन उपलब्ध
+🏥 Medical Leave: ${ml} दिन उपलब्ध
 
-• 🌿 **आकस्मिक अवकाश (Casual Leave - CL):** ${cl} दिन शेष (अधिकतम 14 दिन/वर्ष)
-• 💼 **उपार्जित अवकाश (Earned Leave - EL):** ${el} दिन शेष
-• 🏥 **चिकित्सा अवकाश (Medical Leave - ML):** ${ml} दिन शेष (3 दिन से अधिक पर सक्षम चिकित्सक का प्रमाण पत्र आवश्यक)
+आप कौन सी अवकाश लेना चाहते हैं?`
+          : `Namaste! Aapke paas ye leave options hain:
+🌿 Casual Leave: ${cl} days available
+💼 Earned Leave: ${el} days available  
+🏥 Medical Leave: ${ml} days available
 
-कृपया बताएं कि आप किस प्रकार का अवकाश (Casual, Earned, या Medical Leave) लेना चाहते हैं और कितने दिनों के लिए? (उदाहरण: 'मुझे 3 दिन की casual leave चाहिए')`
-          : `Namaste! Here are all your available leave balances in your eHRMS record:
-
-• 🌿 **Casual Leave (CL):** ${cl} day(s) available (max 14 days/year)
-• 💼 **Earned Leave (EL):** ${el} day(s) available
-• 🏥 **Medical Leave (ML):** ${ml} day(s) available (medical certificate required for > 3 days)
-
-Please let me know: which type of leave (Casual, Earned, or Medical) would you like to apply for and for how many days? (e.g. 'I want 3 days casual leave')`;
+Aap kaunsi leave lena chahte hain?`;
 
         accessedLocalRecord = {
           all_leaves_balance: `Casual: ${cl} days, Earned: ${el} days, Medical: ${ml} days`,
@@ -1027,19 +1039,19 @@ Please let me know: which type of leave (Casual, Earned, or Medical) would you l
           : 'SevaSaathi is authorized only for Manav Sampada eHRMS services — leave applications, balance checks, service book, property return, and related queries. That topic falls outside my scope.';
         accessedLocalRecord = { intent_handled: 'out_of_scope — local only, 0 bytes sent to AI' };
       } else if (intent === 'ask_leave_days') {
-        const leaveNameHi =
-          leaveType === 'earned'  ? 'उपार्जित अवकाश (Earned Leave — EL)'
-          : leaveType === 'medical' ? 'चिकित्सा अवकाश (Medical Leave — ML)'
-          : 'आकस्मिक अवकाश (Casual Leave — CL)';
         const leaveNameEn =
-          leaveType === 'earned'  ? 'Earned Leave (EL)'
-          : leaveType === 'medical' ? 'Medical Leave (ML)'
-          : 'Casual Leave (CL)';
+          leaveType === 'earned'  ? 'Earned Leave'
+          : leaveType === 'medical' ? 'Medical Leave'
+          : 'Casual Leave';
+        const leaveNameHi =
+          leaveType === 'earned'  ? 'उपार्जित अवकाश (Earned Leave)'
+          : leaveType === 'medical' ? 'चिकित्सा अवकाश (Medical Leave)'
+          : 'आकस्मिक अवकाश (Casual Leave)';
         const balance = employee?.leave_balance?.[leaveType] ?? 0;
 
         localReply = isDevanagari
-          ? `नमस्ते! आपके eHRMS खाते में अभी **${balance} दिन** का ${leaveNameHi} उपलब्ध है।\n\nआप **कितने दिनों** के लिए और **किस तिथि से** छुट्टी लेना चाहते हैं?\n_(उदाहरण: \u201c3 दिन, कल से\u201d या \u201cteen din agle somwar se\u201d)_`
-          : `Namaste! You have **${balance} day(s)** of ${leaveNameEn} available.\n\nHow many days would you like, and from which date?\n_(e.g., \u201c3 days from tomorrow\u201d or \u201cteen din kal se\u201d)_`;
+          ? `ठीक है, ${leaveNameHi}। कितने दिन चाहिए, और किस तारीख से?`
+          : `Theek hai, ${leaveNameEn}. Kitne din chahiye, aur kis tareekh se?`;
 
         accessedLocalRecord = {
           intent_handled: `ask_leave_days (${leaveType}) — local only, 0 bytes sent to AI`,
@@ -1055,6 +1067,8 @@ Please let me know: which type of leave (Casual, Earned, or Medical) would you l
         response_summary: localReply.slice(0, 120),
       });
 
+      const nextPendingType = intent === 'ask_leave_days' ? leaveType : null;
+
       return NextResponse.json({
         aiMessage: localReply,
         reply: localReply,
@@ -1062,9 +1076,13 @@ Please let me know: which type of leave (Casual, Earned, or Medical) would you l
         conversationState: {
           activeLeaveDraft,
           lastCreatedApplication,
+          pendingLeaveType: nextPendingType,
+          pendingDays: null,
         },
         activeLeaveDraft,
         lastCreatedApplication,
+        pendingLeaveType: nextPendingType,
+        pendingDays: null,
         dataBoundary: {
           staysLocal: {
             name: employee?.name || '',
@@ -1326,9 +1344,13 @@ Please let me know: which type of leave (Casual, Earned, or Medical) would you l
       conversationState: {
         activeLeaveDraft,
         lastCreatedApplication,
+        pendingLeaveType: null,
+        pendingDays: null,
       },
       activeLeaveDraft,
       lastCreatedApplication,
+      pendingLeaveType: null,
+      pendingDays: null,
       dataBoundary: {
         staysLocal: {
           name: employee?.name || '',
