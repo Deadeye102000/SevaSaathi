@@ -105,7 +105,6 @@ export default function ChatWindow({ onDataBoundaryUpdate, onApplicationsUpdate,
             ...prev,
             lastCreatedApplication: latest,
           }));
-          setLatestApplication(latest);
         }
       })
       .catch((err) => console.warn('Failed to fetch initial KV balances:', err));
@@ -279,36 +278,8 @@ export default function ChatWindow({ onDataBoundaryUpdate, onApplicationsUpdate,
         if (fileInputRef.current) fileInputRef.current.value = '';
       }
 
-      // Detect status check or application creation in response
+      // Detect application creation in response
       const applicationCreated = data.lastCreatedApplication || (data.conversationState?.lastCreatedApplication);
-
-      if (applicationCreated) {
-        setLatestApplication(applicationCreated);
-      } else if (
-        replyText.includes('Approved') ||
-        replyText.includes('Submitted') ||
-        replyText.includes('Sent Back') ||
-        replyText.includes('Rejected')
-      ) {
-        const detectedStatus = replyText.includes('Approved')
-          ? 'Approved'
-          : replyText.includes('Sent Back')
-          ? 'Sent Back'
-          : replyText.includes('Rejected')
-          ? 'Rejected'
-          : 'Submitted';
-
-        setLatestApplication((prev) => ({
-          ...(prev || {
-            id: 'LV-2026-0311',
-            type: 'casual',
-            days: 3,
-            routed_to: 'Smt. Anita Sharma, BSA',
-          }),
-          status: detectedStatus,
-          routed_to: 'Smt. Anita Sharma, BSA',
-        }));
-      }
 
       // Plain conversational text ONLY in chat message bubbles
       const botMessage = {
