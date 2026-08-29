@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import StatusTracker from './StatusTracker';
+import { DEFAULT_EMPLOYEE_NAME, DEFAULT_EMPLOYEE_ID, DEFAULT_REPORTING_OFFICER } from '@/lib/constants';
 
-export default function ApplicationsPanel({ applications = [], employeeName = 'Ravi Kumar', employeeId = 'UP-EHRMS-88213' }) {
+export default function ApplicationsPanel({ applications = [], employeeName = DEFAULT_EMPLOYEE_NAME, employeeId = DEFAULT_EMPLOYEE_ID }) {
   const [filter, setFilter] = useState('ALL');
 
   const filteredApps = applications.filter((app) => {
@@ -18,7 +19,7 @@ Employee: ${employeeName} (${employeeId})
 Leave Type: ${(app.type || 'casual').toUpperCase()} Leave
 Duration: ${app.days} Day(s)
 Status: ${app.status}
-Routed To: ${app.routed_to || 'Smt. Anita Sharma, BSA'}`;
+Routed To: ${app.routed_to || DEFAULT_REPORTING_OFFICER}`;
     navigator.clipboard.writeText(text);
     alert('Application Slip copied to clipboard!');
   };

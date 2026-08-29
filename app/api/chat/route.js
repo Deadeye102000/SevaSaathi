@@ -324,7 +324,7 @@ function resolveRelativeDateOffset(message) {
  * Parses user message into structured intent and parameters,
  * supporting multi-turn drafts, Hindi/English inputs, and document requirements.
  */
-export function parseUserIntent(message = '', conversationHistory = [], documentAttached = false, activeLeaveDraft = null, pendingLeaveType = null) {
+export function parseUserIntent(message = '', conversationHistory = [], documentAttached = false, activeLeaveDraft = null, pendingLeaveType = null, pendingDays = null) {
   // Normalize Hinglish/Hindi word-numbers to digits before any regex matching
   const text = normalizeWordNumbers(message.toLowerCase().trim());
 
@@ -500,7 +500,7 @@ export function parseUserIntent(message = '', conversationHistory = [], document
     dates.length > 0 ||
     _startOffset !== 0 ||
     /\b(kal|aaj|today|tomorrow|somvar|mangalvar|budhvar|guruvar|shukravar|shanivar|ravivar|monday|tuesday|wednesday|thursday|friday|saturday|sunday|hafte|hafta|next week)\b/i.test(message) ||
-    /(\d{1,2})\s*(?:तारीख|ता०|से|को|अक्टूबर|सितंबर|अगस्त|जनवरी|फरवरी|मार्च|अप्रैल|मई|जून|जुलाई|नवंबर|दिसंबर)/u.test(message);
+    /(\d{1,2})\s*(?:st|nd|rd|th)?\s*(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec|january|february|march|april|may|june|july|august|september|october|november|december|तारीख|ता०|से|को|अक्टूबर|सितंबर|अगस्त|जनवरी|फरवरी|मार्च|अप्रैल|मई|जून|जुलाई|नवंबर|दिसंबर)/i.test(message);
 
   // STEP 1: If user asks to apply or check leaves but specifies NEITHER leave type NOR days (and no pending type):
   if (!hasExplicitLeaveType && !pendingLeaveType && (isGeneralLeaveQuery || isApply || isBalance)) {

@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import DataBoundaryPanel from '@/components/DataBoundaryPanel';
-import StatusTracker from '@/components/StatusTracker';
+import { DEFAULT_EMPLOYEE_ID, INITIAL_LEAVE_BALANCES } from '@/lib/constants';
 
 const PROMPT_GROUPS = [
   {
@@ -70,13 +69,6 @@ export default function ChatWindow({ onDataBoundaryUpdate, onApplicationsUpdate,
   const [speechLang, setSpeechLang] = useState('hi-IN'); // 'hi-IN' or 'en-IN'
   const [fontSize, setFontSize] = useState('normal'); // 'normal' or 'large'
   const [showBalanceBar, setShowBalanceBar] = useState(true);
-  const [latestApplication, setLatestApplication] = useState({
-    id: 'LV-2026-0311',
-    type: 'casual',
-    days: 3,
-    status: 'Approved',
-    routed_to: 'Smt. Anita Sharma, BSA',
-  });
 
   const [conversationState, setConversationState] = useState({
     activeLeaveDraft: null,
@@ -84,13 +76,8 @@ export default function ChatWindow({ onDataBoundaryUpdate, onApplicationsUpdate,
   });
 
   // Employee leave balances synced from server KV
-  const [balances, setBalances] = useState({
-    casual: 8,
-    earned: 22,
-    medical: 12,
-  });
-
-  const [employeeId, setEmployeeId] = useState('UP-EHRMS-88213');
+  const [balances, setBalances] = useState(INITIAL_LEAVE_BALANCES);
+  const [employeeId, setEmployeeId] = useState(DEFAULT_EMPLOYEE_ID);
 
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
@@ -99,7 +86,7 @@ export default function ChatWindow({ onDataBoundaryUpdate, onApplicationsUpdate,
 
   // Sync balances and lastCreatedApplication from Vercel KV store
   useEffect(() => {
-    let currentEmp = 'UP-EHRMS-88213';
+    let currentEmp = DEFAULT_EMPLOYEE_ID;
     try {
       const stored = localStorage.getItem('sevasaathi_emp_id');
       if (stored) currentEmp = stored;
@@ -126,6 +113,7 @@ export default function ChatWindow({ onDataBoundaryUpdate, onApplicationsUpdate,
     if (messages[0]?.dataBoundary && onDataBoundaryUpdate) {
       onDataBoundaryUpdate(messages[0].dataBoundary);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const scrollToBottom = () => {
@@ -371,57 +359,6 @@ export default function ChatWindow({ onDataBoundaryUpdate, onApplicationsUpdate,
     if (onDataBoundaryUpdate) {
       onDataBoundaryUpdate(welcome.dataBoundary);
     }
-  };
-
-  // Helper to copy application slip text
-  const handleCopySlip = (app) => {
-    const text = `Manav Sampada eHRMS Leave Application Slip
-Application ID: ${app.id}
-Employee: Ravi Kumar (UP-EHRMS-88213)
-Leave Type: ${(app.type || 'casual').toUpperCase()} Leave
-Duration: ${app.days} Day(s)
-Status: ${app.status}
-Routed To: ${app.routed_to || 'Smt. Anita Sharma, BSA'}`;
-    navigator.clipboard.writeText(text);
-    alert('Application Slip copied to clipboard!');
-  };
-
-  const handlePrintSlip = (app) => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>eHRMS Leave Slip - ${app.id}</title>
-          <style>
-            body { font-family: system-ui, sans-serif; padding: 40px; color: #111; }
-            .card { border: 2px solid #047857; padding: 24px; border-radius: 12px; max-width: 500px; margin: 0 auto; }
-            .header { text-align: center; border-bottom: 1px solid #ddd; padding-bottom: 12px; margin-bottom: 16px; }
-            .header h2 { margin: 0; color: #047857; }
-            .row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px stroke #eee; }
-            .label { font-weight: bold; color: #555; }
-            .badge { background: #d1fae5; color: #065f46; padding: 4px 10px; border-radius: 99px; font-weight: bold; }
-          </style>
-        </head>
-        <body>
-          <div class="card">
-            <div class="header">
-              <h2>Manav Sampada eHRMS (UP)</h2>
-              <p>Official Leave Application Slip</p>
-            </div>
-            <div class="row"><span class="label">Application ID:</span> <span>${app.id}</span></div>
-            <div class="row"><span class="label">Employee Name:</span> <span>Ravi Kumar</span></div>
-            <div class="row"><span class="label">Employee ID:</span> <span>UP-EHRMS-88213</span></div>
-            <div class="row"><span class="label">Leave Type:</span> <span>${(app.type || 'casual').toUpperCase()}</span></div>
-            <div class="row"><span class="label">Days Requested:</span> <span>${app.days} Day(s)</span></div>
-            <div class="row"><span class="label">Current Status:</span> <span class="badge">${app.status}</span></div>
-            <div class="row"><span class="label">Routed Authority:</span> <span>${app.routed_to || 'Smt. Anita Sharma, BSA'}</span></div>
-          </div>
-          <script>window.print();</script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
   };
 
 
