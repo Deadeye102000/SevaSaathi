@@ -710,8 +710,65 @@ Please let me know: which type of leave (Casual, Earned, or Medical) would you l
     : 'Namaste! I am SevaSaathi, your Government Service and Leave Assistant. I can help you check balances, submit leave applications, verify service book details, and understand Manav Sampada eHRMS policies.';
 }
 
+let inMemoryRateLimitMap = new Map();
+
+/**
+ * Enforces rate limiting per IP address (max 30 requests per minute).
+ */
+async function checkRateLimit(request) {
+  const ip =
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    request.headers.get('x-real-ip') ||
+    '127.0.0.1';
+
+  const windowSec = 60;
+  const maxReqs = 30;
+  const kvKey = `ip:rate_limit:${ip}`;
+
+  try {
+    if (process.env.KV_REST_API_URL || process.env.VERCEL_KV_API_URL || process.env.KV_URL) {
+      const current = await kv.incr(kvKey);
+      if (current === 1) {
+        await kv.expire(kvKey, windowSec);
+      }
+      if (current > maxReqs) {
+        return { allowed: false, count: current };
+      }
+      return { allowed: true, count: current };
+    }
+  } catch (err) {
+    console.warn('Vercel KV rate limit error (using fallback):', err.message);
+  }
+
+  const now = Date.now();
+  const entry = inMemoryRateLimitMap.get(ip) || { count: 0, resetAt: now + windowSec * 1000 };
+
+  if (now > entry.resetAt) {
+    entry.count = 1;
+    entry.resetAt = now + windowSec * 1000;
+  } else {
+    entry.count += 1;
+  }
+
+  inMemoryRateLimitMap.set(ip, entry);
+
+  if (entry.count > maxReqs) {
+    return { allowed: false, count: entry.count };
+  }
+  return { allowed: true, count: entry.count };
+}
+
 export async function POST(request) {
   try {
+    // 1. Rate Limiting Check (30 reqs/min)
+    const rateLimit = await checkRateLimit(request);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please wait a minute before sending more messages.' },
+        { status: 429 }
+      );
+    }
+
     let message = '';
     let conversationHistory = [];
     let documentAttached = false;
