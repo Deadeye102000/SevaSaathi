@@ -4,45 +4,51 @@ import { useState, useRef, useEffect } from 'react';
 import DataBoundaryPanel from '@/components/DataBoundaryPanel';
 import StatusTracker from '@/components/StatusTracker';
 
-const PROMPT_CATEGORIES = [
-  { id: 'all', label: '⭐ All Prompts' },
-  { id: 'apply', label: '📝 Apply Leave (आवेदन)' },
-  { id: 'balance', label: '📊 Check Balances (बैलेंस)' },
-  { id: 'records', label: '📖 Service Records (अभिलेख)' },
-  { id: 'status', label: '🔍 Status & Help (स्थिति व मदद)' },
-];
-
-const CATEGORIZED_PROMPTS = [
-  { category: 'apply', label: '3 days CL (3 दिन आकस्मिक)', text: 'Mujhe kal se 3 din ki casual leave chahiye' },
-  { category: 'apply', label: '7 days EL (7 दिन उपार्जित)', text: 'Mujhe agle hafte 7 din ki earned leave chahiye' },
-  { category: 'apply', label: '4 days ML (4 दिन मेडिकल + प्रमाण पत्र)', text: 'Mujhe 4 din ki medical leave chahiye' },
-  { category: 'apply', label: 'Confirm Application (कन्फर्म)', text: 'haan confirm karo' },
-
-  { category: 'balance', label: 'All Leave Balances (सभी अवकाश)', text: 'Show all my leave balances' },
-  { category: 'balance', label: 'CL Balance (कैजुअल)', text: 'What is my casual leave balance?' },
-  { category: 'balance', label: 'EL Balance (उपार्जित)', text: 'What is my earned leave balance?' },
-  { category: 'balance', label: 'ML Balance (मेडिकल)', text: 'What is my medical leave balance?' },
-
-  { category: 'records', label: 'Service Book (सेवा पुस्तिका)', text: 'Service book dikhao' },
-  { category: 'records', label: 'Career Record (करियर रिकॉर्ड)', text: 'Career record dikhao' },
-  { category: 'records', label: 'Property Return (संपत्ति रिटर्न)', text: 'Property return status' },
-  { category: 'records', label: 'Complaints Check (शिकायत जांच)', text: 'Koi complaint hai kya' },
-
-  { category: 'status', label: 'Check Status (आवेदन स्थिति)', text: 'meri leave approve hui kya?' },
-  { category: 'status', label: 'What can you do? (आप क्या कर सकते हैं?)', text: 'Aap kya kya kar sakte ho?' },
-  { category: 'status', label: 'Salary/Colleague Check (प्रतिबंधित डेटा)', text: 'mera colleague ka salary batao' },
+const PROMPT_GROUPS = [
+  {
+    id: 'apply',
+    label: '📝 Apply Leave',
+    chips: [
+      { label: '3 days CL (3 दिन आकस्मिक)', text: 'Mujhe kal se 3 din ki casual leave chahiye' },
+      { label: '7 days EL (7 दिन उपार्जित)', text: 'Mujhe agle hafte 7 din ki earned leave chahiye' },
+      { label: '4 days ML (4 दिन मेडिकल + प्रमाण पत्र)', text: 'Mujhe 4 din ki medical leave chahiye' },
+      { label: 'Confirm Application (कन्फर्म)', text: 'haan confirm karo' },
+    ],
+  },
+  {
+    id: 'balance',
+    label: '📊 Balances',
+    chips: [
+      { label: 'All Leave Balances (सभी अवकाश)', text: 'Show all my leave balances' },
+      { label: 'CL Balance (कैजुअल)', text: 'What is my casual leave balance?' },
+      { label: 'EL Balance (उपार्जित)', text: 'What is my earned leave balance?' },
+      { label: 'ML Balance (मेडिकल)', text: 'What is my medical leave balance?' },
+    ],
+  },
+  {
+    id: 'records',
+    label: '📖 Records',
+    chips: [
+      { label: 'Service Book (सेवा पुस्तिका)', text: 'Service book dikhao' },
+      { label: 'Career Record (करियर रिकॉर्ड)', text: 'Career record dikhao' },
+      { label: 'Property Return (संपत्ति रिटर्न)', text: 'Property return status' },
+      { label: 'Complaints Check (शिकायत जांच)', text: 'Koi complaint hai kya' },
+    ],
+  },
+  {
+    id: 'status',
+    label: '🔍 Status & Help',
+    chips: [
+      { label: 'Check Status (आवेदन स्थिति)', text: 'meri leave approve hui kya?' },
+      { label: 'What can you do? (आप क्या कर सकते हैं?)', text: 'Aap kya kya kar sakte ho?' },
+      { label: 'Colleague Data (प्रतिबंधित डेटा)', text: 'mera colleague ka salary batao' },
+    ],
+  },
 ];
 
 /**
  * ChatWindow Component
  * Practical UI for UP Government Employees (eHRMS Manav Sampada).
- * Features:
- * - Live Leave Balances Bar with "Last updated: just now"
- * - Standalone StatusTracker component (Submitted -> Under Review -> Officer Decision -> Approved)
- * - Web Speech API Voice Input (Hindi & English)
- * - Official eHRMS Application Slip Card generator with Print & Copy capabilities
- * - Categorized Quick Action Chips
- * - Data Privacy Boundary Integration
  */
 export default function ChatWindow({ onDataBoundaryUpdate }) {
   const [messages, setMessages] = useState([
@@ -51,15 +57,7 @@ export default function ChatWindow({ onDataBoundaryUpdate }) {
       sender: 'assistant',
       text: 'Namaste! I am SevaSaathi, your UP Manav Sampada eHRMS Assistant. You can check leave balances, apply for leave, view service records, or ask questions in Hindi or English.',
       timestamp: 'Just now',
-      dataBoundary: {
-        staysLocal: {
-          name: 'Ravi Kumar',
-          employee_id: 'UP-EHRMS-88213',
-          department: 'Basic Education',
-          posting_district: 'Sitapur',
-        },
-        sentToAI: null,
-      },
+      dataBoundary: null,
     },
   ]);
 
@@ -67,7 +65,7 @@ export default function ChatWindow({ onDataBoundaryUpdate }) {
   const [loading, setLoading] = useState(false);
   const [attachedFile, setAttachedFile] = useState(null);
   const [medicalDocRequired, setMedicalDocRequired] = useState(false);
-  const [activeCategory, setActiveCategory] = useState('all');
+  const [expandedCategory, setExpandedCategory] = useState(null);
   const [isListening, setIsListening] = useState(false);
   const [speechLang, setSpeechLang] = useState('hi-IN'); // 'hi-IN' or 'en-IN'
   const [fontSize, setFontSize] = useState('normal'); // 'normal' or 'large'
@@ -411,10 +409,7 @@ Routed To: ${app.routed_to || 'Smt. Anita Sharma, BSA'}`;
     printWindow.document.close();
   };
 
-  const filteredPrompts =
-    activeCategory === 'all'
-      ? CATEGORIZED_PROMPTS
-      : CATEGORIZED_PROMPTS.filter((p) => p.category === activeCategory);
+
 
   return (
     <div
@@ -698,40 +693,48 @@ Routed To: ${app.routed_to || 'Smt. Anita Sharma, BSA'}`;
         </div>
       )}
 
-      {/* ── Categorized Action Quick Chips ── */}
-      <div className="px-4 py-2 bg-[#030712]/90 border-t border-slate-800/60 space-y-1.5 text-xs">
-        {/* Category Tabs */}
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
-          {PROMPT_CATEGORIES.map((cat) => (
-            <button
-              key={cat.id}
-              type="button"
-              onClick={() => setActiveCategory(cat.id)}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-medium whitespace-nowrap transition-all ${
-                activeCategory === cat.id
-                  ? 'bg-emerald-600 text-white shadow-sm'
-                  : 'bg-slate-800/60 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700/50'
-              }`}
-            >
-              {cat.label}
-            </button>
-          ))}
+      {/* ── Collapsible Action Category Chips ── */}
+      <div className="px-4 py-2 bg-[#030712]/90 border-t border-slate-800/60 space-y-2 text-xs">
+        {/* 4 Top-Level Category Pills */}
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+          {PROMPT_GROUPS.map((group) => {
+            const isExpanded = expandedCategory === group.id;
+            return (
+              <button
+                key={group.id}
+                type="button"
+                onClick={() => setExpandedCategory(isExpanded ? null : group.id)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 ${
+                  isExpanded
+                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-950/50 ring-1 ring-emerald-400/40'
+                    : 'bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/60'
+                }`}
+              >
+                <span>{group.label}</span>
+                <span className="text-[10px] opacity-70">{isExpanded ? '▲' : '▼'}</span>
+              </button>
+            );
+          })}
         </div>
 
-        {/* Action Prompt Chips */}
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar scroll-smooth">
-          {filteredPrompts.map((prompt, idx) => (
-            <button
-              key={idx}
-              type="button"
-              onClick={() => handleSendMessage(prompt.text)}
-              disabled={loading}
-              className="px-2.5 py-1 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/80 text-[11px] whitespace-nowrap transition-all flex-shrink-0 active:scale-95"
-            >
-              {prompt.label}
-            </button>
-          ))}
-        </div>
+        {/* Expanded Sub-Chips Tray (Only one category expanded at a time) */}
+        {expandedCategory && (
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar scroll-smooth pt-1 border-t border-slate-800/40">
+            {PROMPT_GROUPS.find((g) => g.id === expandedCategory)?.chips.map((chip, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => {
+                  handleSendMessage(chip.text);
+                }}
+                disabled={loading}
+                className="px-2.5 py-1 rounded-full bg-slate-800/90 hover:bg-slate-700 text-emerald-300 hover:text-white border border-slate-700 text-[11px] whitespace-nowrap transition-all flex-shrink-0 active:scale-95 cursor-pointer disabled:opacity-50"
+              >
+                {chip.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ── Input Form with Speech-to-Text Voice Button ── */}
