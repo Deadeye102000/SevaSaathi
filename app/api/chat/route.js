@@ -779,6 +779,8 @@ export async function POST(request) {
     let documentAttached = false;
     let activeLeaveDraft = null;
     let lastCreatedApplication = null;
+    let pendingLeaveType = null;
+    let pendingDays = null;
 
     const contentType = request.headers.get('content-type') || '';
     if (contentType.includes('multipart/form-data')) {
