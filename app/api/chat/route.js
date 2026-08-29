@@ -139,6 +139,84 @@ async function persistApplicationToKV(application) {
   inMemoryApplicationsStore[application.id] = application;
 }
 
+/**
+ * Returns all leave applications for the reporting officer's dashboard.
+ */
+export async function getAllApplicationsFromKV() {
+  const employee = await getEmployeeFromKV();
+  const list = [];
+
+  if (Array.isArray(employee.leave_history)) {
+    for (const app of employee.leave_history) {
+      if (!list.some((a) => a.id === app.id)) {
+        list.push({
+          ...app,
+          employee_name: employee.name || 'Ravi Kumar',
+          employee_id: employee.employee_id || 'UP-EHRMS-88213',
+          department: employee.department || 'Basic Education',
+          posting_district: employee.posting_district || 'Sitapur',
+        });
+      }
+    }
+  }
+
+  for (const app of Object.values(inMemoryApplicationsStore)) {
+    if (app && !list.some((a) => a.id === app.id)) {
+      list.unshift({
+        ...app,
+        employee_name: employee.name || 'Ravi Kumar',
+        employee_id: employee.employee_id || 'UP-EHRMS-88213',
+        department: employee.department || 'Basic Education',
+        posting_district: employee.posting_district || 'Sitapur',
+      });
+    }
+  }
+
+  return list;
+}
+
+/**
+ * Updates application status and officer remark in KV and employee.leave_history.
+ */
+export async function updateApplicationStatusInKV(applicationId, newStatus, remark = '') {
+  const employee = await getEmployeeFromKV();
+  let found = false;
+
+  if (Array.isArray(employee.leave_history)) {
+    for (const app of employee.leave_history) {
+      if (app.id === applicationId) {
+        app.status = newStatus;
+        if (remark) app.remark = remark;
+        app.updatedAt = new Date().toISOString();
+        found = true;
+      }
+    }
+  }
+
+  if (inMemoryApplicationsStore[applicationId]) {
+    inMemoryApplicationsStore[applicationId].status = newStatus;
+    if (remark) inMemoryApplicationsStore[applicationId].remark = remark;
+    inMemoryApplicationsStore[applicationId].updatedAt = new Date().toISOString();
+  }
+
+  if (process.env.KV_REST_API_URL || process.env.VERCEL_KV_API_URL || process.env.KV_URL) {
+    try {
+      const app = await kv.get(`application:${applicationId}`);
+      if (app) {
+        app.status = newStatus;
+        if (remark) app.remark = remark;
+        app.updatedAt = new Date().toISOString();
+        await kv.set(`application:${applicationId}`, app);
+      }
+    } catch (err) {
+      console.warn('Vercel KV update application error:', err.message);
+    }
+  }
+
+  await saveEmployeeToKV(employee);
+  return { success: true, applicationId, status: newStatus, remark };
+}
+
 let inMemoryAuditLog = [];
 
 /**

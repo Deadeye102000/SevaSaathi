@@ -47,8 +47,17 @@ export default function ChatPage() {
             </div>
           </div>
 
-          {/* Right: User chip & Audit link */}
+          {/* Right: User chip, Officer View & Audit links */}
           <div className="flex items-center gap-2 flex-shrink-0">
+            <Link
+              href="/officer"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/20 text-[11px] font-medium transition-all"
+              title="Reporting Officer Dashboard (Smt. Anita Sharma, BSA)"
+            >
+              <span>👔</span>
+              <span className="hidden sm:inline">Officer View (Demo)</span>
+            </Link>
+
             <Link
               href="/audit"
               className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-[11px] font-medium transition-all"
